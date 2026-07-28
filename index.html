@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f5e9c" />
+  <title>Verano Energy — Registros de terreno</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-title">
+      <img src="icons/logo-biocys.jpg" alt="Biocys" class="logo-biocys" />
+      <h1>Verano Energy — Registros</h1>
+    </div>
+    <span id="net-status" class="net-status">●</span>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-view="edt61">6.1 Transecto</button>
+    <button class="tab" data-view="edt62">6.2 Parcela</button>
+    <button class="tab" data-view="edt63">6.3 Calicata</button>
+    <button class="tab" data-view="export">Exportar</button>
+  </nav>
+
+  <main>
+    <!-- ===================== 6.1 ZONA Y TRANSECTO ===================== -->
+    <section id="view-edt61" class="view active" data-edt="6.1">
+      <nav class="subtabs">
+        <button class="subtab active" data-sub="form">📝 Nuevo</button>
+        <button class="subtab" data-sub="list">📋 Registros <span class="badge" data-count>0</span></button>
+      </nav>
+
+      <div class="subview active" data-sub="form">
+        <form class="reg-form" data-edt="6.1" autocomplete="off">
+          <fieldset>
+            <legend>Zona y transecto</legend>
+            <label>Zona
+              <input type="text" data-f="zona" required />
+            </label>
+            <div class="grid-2">
+              <label>Fecha
+                <input type="date" data-f="fecha" required />
+              </label>
+              <label>Evaluadora
+                <select data-f="evaluadora" required></select>
+              </label>
+            </div>
+            <label>N° de transecto (1–177)
+              <input type="number" data-f="numero_unidad" min="1" max="177" step="1" inputmode="numeric" required />
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Punto centro del transecto</legend>
+            <div class="row gps-row">
+              <button type="button" class="btn-gps" data-gps-main>📍 Capturar GPS</button>
+              <span class="hint" data-gps-acc></span>
+            </div>
+            <div class="grid-2">
+              <label>UTM Este
+                <input type="text" data-f="utm_este" readonly />
+              </label>
+              <label>UTM Norte
+                <input type="text" data-f="utm_norte" readonly />
+              </label>
+            </div>
+            <label>Código GPS zona (opcional)
+              <input type="text" data-f="codigo_gps_zona" />
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Observación de terreno</legend>
+            <div class="grid-2">
+              <label>¿Vegetación acompañante?
+                <select data-f="presencia_vegetacion_acompanante" required>
+                  <option value="">— Seleccionar —</option>
+                  <option>Sí</option>
+                  <option>No</option>
+                </select>
+              </label>
+              <label>¿Presencia de curureras?
+                <select data-f="presencia_curureras" required>
+                  <option value="">— Seleccionar —</option>
+                  <option>Sí</option>
+                  <option>No</option>
+                </select>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Fotografía del transecto</legend>
+            <div class="foto-row">
+              <button type="button" class="btn-foto" data-foto-main>📷 Tomar foto</button>
+              <input type="file" data-foto-input-main accept="image/*" capture="environment" class="hidden" />
+            </div>
+            <div class="foto-preview hidden" data-foto-preview-main>
+              <img data-foto-img-main />
+              <button type="button" class="btn-mini danger" data-foto-del-main>Quitar foto</button>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Indicios encontrados</legend>
+            <p class="hint">Si hay uno o más indicios (huellas, madrigueras, restos, etc.), agrégalos aquí con su propio punto GPS y foto.</p>
+            <div class="indicios-list" data-indicios></div>
+            <button type="button" class="btn-ghost" data-add-indicio>➕ Agregar indicio</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>Observaciones</legend>
+            <textarea data-f="observaciones" rows="3" placeholder="Notas generales del transecto (opcional)"></textarea>
+          </fieldset>
+
+          <div class="actions">
+            <button type="submit" class="btn-primary">💾 Guardar registro</button>
+            <button type="reset" class="btn-ghost">Limpiar</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="subview" data-sub="list">
+        <div class="list" data-list></div>
+        <p class="empty" data-empty>Aún no hay transectos registrados.</p>
+      </div>
+    </section>
+
+    <!-- ===================== 6.2 PARCELA ===================== -->
+    <section id="view-edt62" class="view" data-edt="6.2">
+      <nav class="subtabs">
+        <button class="subtab active" data-sub="form">📝 Nuevo</button>
+        <button class="subtab" data-sub="list">📋 Registros <span class="badge" data-count>0</span></button>
+      </nav>
+
+      <div class="subview active" data-sub="form">
+        <form class="reg-form" data-edt="6.2" autocomplete="off">
+          <fieldset>
+            <legend>Parcela</legend>
+            <label>Código de zona
+              <input type="text" data-f="zona" required />
+            </label>
+            <div class="grid-2">
+              <label>Fecha
+                <input type="date" data-f="fecha" required />
+              </label>
+              <label>Evaluadora
+                <select data-f="evaluadora" required></select>
+              </label>
+            </div>
+            <label>N° de parcela (1–177)
+              <input type="number" data-f="numero_unidad" min="1" max="177" step="1" inputmode="numeric" required />
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Punto centro de la parcela</legend>
+            <div class="row gps-row">
+              <button type="button" class="btn-gps" data-gps-main>📍 Capturar GPS</button>
+              <span class="hint" data-gps-acc></span>
+            </div>
+            <div class="grid-2">
+              <label>UTM Este
+                <input type="text" data-f="utm_este" readonly />
+              </label>
+              <label>UTM Norte
+                <input type="text" data-f="utm_norte" readonly />
+              </label>
+            </div>
+            <label>Código GPS parcela (opcional)
+              <input type="text" data-f="codigo_gps_parcela" />
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Vegetación</legend>
+            <label>Tipo de vegetación observada
+              <select data-f="tipo_vegetacion" required></select>
+            </label>
+            <label class="hidden" data-otro-vegetacion-wrap>Especificar "Otro"
+              <input type="text" data-f="tipo_vegetacion_otro" />
+            </label>
+            <label>Especies observadas (con % de cobertura de cada una)
+              <textarea data-f="especies" rows="2" placeholder="Ej: Coirón 40%, Neneo 30%, Suelo desnudo 30%"></textarea>
+            </label>
+            <label>¿Presencia de curureras?
+              <select data-f="presencia_curureras" required>
+                <option value="">— Seleccionar —</option>
+                <option>Sí</option>
+                <option>No</option>
+              </select>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Fotografía de la parcela</legend>
+            <div class="foto-row">
+              <button type="button" class="btn-foto" data-foto-main>📷 Tomar foto</button>
+              <input type="file" data-foto-input-main accept="image/*" capture="environment" class="hidden" />
+            </div>
+            <div class="foto-preview hidden" data-foto-preview-main>
+              <img data-foto-img-main />
+              <button type="button" class="btn-mini danger" data-foto-del-main>Quitar foto</button>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Indicios encontrados</legend>
+            <p class="hint">Si hay uno o más indicios, agrégalos aquí con su propio punto GPS y foto.</p>
+            <div class="indicios-list" data-indicios></div>
+            <button type="button" class="btn-ghost" data-add-indicio>➕ Agregar indicio</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>Observaciones</legend>
+            <textarea data-f="observaciones" rows="3" placeholder="Notas generales de la parcela (opcional)"></textarea>
+          </fieldset>
+
+          <div class="actions">
+            <button type="submit" class="btn-primary">💾 Guardar registro</button>
+            <button type="reset" class="btn-ghost">Limpiar</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="subview" data-sub="list">
+        <div class="list" data-list></div>
+        <p class="empty" data-empty>Aún no hay parcelas registradas.</p>
+      </div>
+    </section>
+
+    <!-- ===================== 6.3 CALICATAS ===================== -->
+    <section id="view-edt63" class="view" data-edt="6.3">
+      <nav class="subtabs">
+        <button class="subtab active" data-sub="form">📝 Nuevo</button>
+        <button class="subtab" data-sub="list">📋 Registros <span class="badge" data-count>0</span></button>
+      </nav>
+
+      <div class="subview active" data-sub="form">
+        <form class="reg-form" data-edt="6.3" autocomplete="off">
+          <fieldset>
+            <legend>Calicata</legend>
+            <label>Zona
+              <input type="text" data-f="zona" required />
+            </label>
+            <div class="grid-2">
+              <label>Fecha
+                <input type="date" data-f="fecha" required />
+              </label>
+              <label>Evaluadora
+                <select data-f="evaluadora" required></select>
+              </label>
+            </div>
+            <label>N° de calicata (1–177)
+              <input type="number" data-f="numero_unidad" min="1" max="177" step="1" inputmode="numeric" required />
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Punto de la calicata</legend>
+            <div class="row gps-row">
+              <button type="button" class="btn-gps" data-gps-main>📍 Capturar GPS</button>
+              <span class="hint" data-gps-acc></span>
+            </div>
+            <div class="grid-2">
+              <label>UTM Este
+                <input type="text" data-f="utm_este" readonly />
+              </label>
+              <label>UTM Norte
+                <input type="text" data-f="utm_norte" readonly />
+              </label>
+            </div>
+            <label>Código GPS calicata (opcional)
+              <input type="text" data-f="codigo_gps_calicata" />
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Fotografía general de la calicata</legend>
+            <div class="foto-row">
+              <button type="button" class="btn-foto" data-foto-main>📷 Tomar foto</button>
+              <input type="file" data-foto-input-main accept="image/*" capture="environment" class="hidden" />
+            </div>
+            <div class="foto-preview hidden" data-foto-preview-main>
+              <img data-foto-img-main />
+              <button type="button" class="btn-mini danger" data-foto-del-main>Quitar foto</button>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Geófitas encontradas</legend>
+            <label>¿Presencia de geófita?
+              <select data-f="presencia_geofita" required>
+                <option value="">— Seleccionar —</option>
+                <option>Sí</option>
+                <option>No</option>
+              </select>
+            </label>
+            <p class="hint">Si hay presencia, agrega un registro por cada individuo encontrado en esta calicata.</p>
+            <div class="individuos-list" data-individuos></div>
+            <button type="button" class="btn-ghost" data-add-individuo>➕ Agregar individuo</button>
+          </fieldset>
+
+          <fieldset>
+            <legend>Observaciones</legend>
+            <textarea data-f="observaciones" rows="3" placeholder="Notas generales de la calicata (opcional)"></textarea>
+          </fieldset>
+
+          <div class="actions">
+            <button type="submit" class="btn-primary">💾 Guardar registro</button>
+            <button type="reset" class="btn-ghost">Limpiar</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="subview" data-sub="list">
+        <div class="list" data-list></div>
+        <p class="empty" data-empty>Aún no hay calicatas registradas.</p>
+      </div>
+    </section>
+
+    <!-- ===================== EXPORTAR ===================== -->
+    <section id="view-export" class="view">
+      <p class="hint">Descarga los datos guardados en este dispositivo.</p>
+      <button type="button" id="exp-xlsx" class="btn-primary">📊 Excel (6.1 + 6.2 + 6.3)</button>
+      <button type="button" id="exp-json" class="btn-ghost">🗄 Respaldo JSON</button>
+      <hr />
+      <label>URL de sincronización (Google Sheets / Apps Script)
+        <input type="url" id="sync-url" placeholder="https://script.google.com/.../exec" />
+      </label>
+      <button type="button" id="btn-sync" class="btn-primary">☁️ Sincronizar en línea</button>
+      <p id="sync-info" class="hint"></p>
+      <p id="stats" class="hint"></p>
+      <p id="app-version" class="hint" style="text-align:center;opacity:.6;margin-top:18px"></p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- Plantillas para bloques repetibles -->
+  <template id="tpl-indicio">
+    <div class="sub-item" data-indicio-item>
+      <div class="sub-item-head">
+        <strong data-indicio-title>Indicio</strong>
+        <button type="button" class="btn-mini danger" data-remove>🗑</button>
+      </div>
+      <div class="row gps-row">
+        <button type="button" class="btn-gps" data-gps>📍 Capturar GPS</button>
+        <span class="hint" data-gps-acc></span>
+      </div>
+      <label>Código GPS indicio (opcional)
+        <input type="text" data-codigo-gps />
+      </label>
+      <div class="foto-row">
+        <button type="button" class="btn-foto" data-foto>📷 Tomar foto</button>
+        <input type="file" data-foto-input accept="image/*" capture="environment" class="hidden" />
+      </div>
+      <div class="foto-preview hidden" data-foto-preview>
+        <img data-foto-img />
+        <button type="button" class="btn-mini danger" data-foto-del>Quitar foto</button>
+      </div>
+      <label>Observaciones del indicio
+        <textarea data-observaciones rows="2"></textarea>
+      </label>
+    </div>
+  </template>
+
+  <template id="tpl-individuo">
+    <div class="sub-item" data-individuo-item>
+      <div class="sub-item-head">
+        <strong data-individuo-title>Individuo</strong>
+        <button type="button" class="btn-mini danger" data-remove>🗑</button>
+      </div>
+      <div class="grid-2">
+        <label>Profundidad de hallazgo (cm)
+          <input type="number" data-profundidad min="0" step="1" inputmode="numeric" />
+        </label>
+        <label>Estado fenológico
+          <select data-fenologico></select>
+        </label>
+      </div>
+      <label>Estado sanitario
+        <select data-sanitario></select>
+      </label>
+      <div class="foto-row">
+        <button type="button" class="btn-foto" data-foto>📷 Tomar foto</button>
+        <input type="file" data-foto-input accept="image/*" capture="environment" class="hidden" />
+      </div>
+      <div class="foto-preview hidden" data-foto-preview>
+        <img data-foto-img />
+        <button type="button" class="btn-mini danger" data-foto-del>Quitar foto</button>
+      </div>
+    </div>
+  </template>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
