@@ -12,7 +12,7 @@ const URL_KEY = 'verano-energy-registros-sync-url';
 // URL del Web App de Apps Script desplegado sobre la planilla de "Registros de
 // terreno" (distinta de la planilla de avance agregado). Ese script es una copia
 // de apps-script/Codigo.gs con su propio SPREADSHEET_ID.
-const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbxUKkJTz7xlt7kzE4pp91TXyK9OUltFQdKLdG5ebT4VVPC_om303jizi_XRcmKbmGq5cA/exec';
+const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbwZXGXuhwVcwpUVdZgZBCNxFml6qe2TnRfswGROmSTyK-Ts8SBFhH_gzIQm3lt5M9nPBA/exec';
 
 export function getUrl() {
   return localStorage.getItem(URL_KEY) || DEFAULT_URL;
