@@ -1,5 +1,6 @@
-// Sincronización de los registros individuales (6.1/6.2/6.3) con el mismo Web App
-// de Apps Script del formulario de avance (misma planilla del proyecto). Cada
+// Sincronización de los registros individuales (6.1/6.2/6.3) con el Web App de
+// Apps Script propio de esta app — una planilla de Google Sheets SEPARADA de la
+// que usa el formulario de avance agregado (Control_VeranoEnergy). Cada
 // registro viaja como { tipo: 'registro_individual', codigo_edt, record_id,
 // registro: {...}, detalle: [...] } — el backend crea/actualiza las hojas
 // Registros_6.x + Indicios_6.1/6.2 o Individuos_6.3, sube las fotos a Drive y
@@ -8,9 +9,10 @@ import * as DB from './db.js';
 
 const URL_KEY = 'verano-energy-registros-sync-url';
 
-// Misma URL del Web App de Verano Energy que usa el formulario de avance —
-// ambas apps escriben en la misma planilla, solo que en hojas distintas.
-const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbwO4ZWOrIqCV81LShY1qjRELSZjPcCtUOVEIahwgRKAeQAVg0lvNbcMRcuM-4RuCSSbMQ/exec';
+// URL del Web App de Apps Script desplegado sobre la planilla de "Registros de
+// terreno" (distinta de la planilla de avance agregado). Ese script es una copia
+// de apps-script/Codigo.gs con su propio SPREADSHEET_ID.
+const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbxUKkJTz7xlt7kzE4pp91TXyK9OUltFQdKLdG5ebT4VVPC_om303jizi_XRcmKbmGq5cA/exec';
 
 export function getUrl() {
   return localStorage.getItem(URL_KEY) || DEFAULT_URL;

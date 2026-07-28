@@ -8,8 +8,10 @@ propio **punto GPS** y **fotografía georreferenciada**.
 Es el complemento del formulario de **avance agregado**
 ([Control_VeranoEnergy](https://github.com/Neecocad/Control_VeranoEnergy)): aquel
 registra cuánto se avanzó cada día (sin foto ni GPS), este registra **el detalle de
-cada unidad** levantada en terreno. Ambas apps sincronizan a la **misma planilla**
-de Google Sheets, en hojas separadas.
+cada unidad** levantada en terreno. Cada app sincroniza contra **su propia
+planilla** de Google Sheets — son dos planillas y dos backends de Apps Script
+independientes (no se cruzan datos automáticamente entre avance agregado y
+detalle por unidad; ver "Próximos pasos" en el README de `Control_VeranoEnergy`).
 
 ## Qué registra cada formulario
 
@@ -31,11 +33,14 @@ propia fotografía, independientes del punto/foto principal del registro.
   avance agregado) — captura `navigator.geolocation`, conversión a UTM
   (`js/utm.js`), y estampado de texto (proyecto, EDT, evaluadora, fecha, UTM) sobre
   la foto vía Canvas antes de guardarla.
-- **Sincronización manual** contra el **mismo Web App de Apps Script** que usa el
-  formulario de avance (`apps-script/Codigo.gs`, en el repo
-  `Control_VeranoEnergy`) — no se crea un backend nuevo. El payload incluye
+- **Sincronización manual** contra un Web App de Apps Script **propio**, desplegado
+  sobre su **propia planilla** de Google Sheets (independiente de la que usa
+  Control_VeranoEnergy). Ese script es una copia de `apps-script/Codigo.gs` (del
+  repo `Control_VeranoEnergy`) con la constante `SPREADSHEET_ID` apuntando a esta
+  planilla nueva en vez de la de avance. El payload incluye
   `tipo: 'registro_individual'` para que el script lo enrute a las hojas
-  correctas sin afectar el flujo de avance.
+  correctas; la rama `tipo: 'avance'` del script queda presente pero sin uso en
+  este deployment.
 
 ## Estructura
 
@@ -75,17 +80,38 @@ Al sincronizar, el Apps Script crea (si no existen) y hace upsert idempotente po
 - **Registros_6.2** / **Indicios_6.2**
 - **Registros_6.3** / **Individuos_6.3**
 
-Las fotos (principal y de cada indicio/individuo) se suben a la misma carpeta de
-Drive que usa el formulario de avance, y la hoja guarda la URL (`foto_url`) en vez
-del base64.
+Las fotos (principal y de cada indicio/individuo) se suben a Drive, dentro de una
+carpeta base "Verano Energy - Fotos" (se crea sola si no existe) en el Drive de
+la cuenta que ejecuta este deployment del script. Dentro de esa carpeta base, el
+script crea automáticamente una **subcarpeta por EDT** — `EDT 6.1`, `EDT 6.2`,
+`EDT 6.3` — para que las fotos de transectos, parcelas y calicatas no se mezclen.
+La hoja guarda la URL (`foto_url`) en vez del base64. **Nota:** si este Apps
+Script se desplegó bajo la misma cuenta de Google que Control_VeranoEnergy,
+ambos comparten la carpeta base "Verano Energy - Fotos" por nombre (pero cada
+uno sigue escribiendo en sus propias subcarpetas por EDT); si se desplegó bajo
+otra cuenta, se crea una carpeta base independiente.
 
 ## Despliegue
 
-### 1. Apps Script
+### 1. Apps Script (planilla y deployment propios)
 
-No se crea un Web App nuevo: se **pega el contenido actualizado** de
-`apps-script/Codigo.gs` (en el repo `Control_VeranoEnergy`) sobre el script ya
-desplegado — la URL `.../exec` no cambia. Ver ese repo para el detalle.
+1. Crea una planilla nueva en Google Sheets (distinta de la de avance) y copia su
+   ID (entre `/d/` y `/edit` en la URL).
+2. En esa planilla: **Extensiones → Apps Script**, pega el contenido de
+   `apps-script/Codigo.gs` (del repo `Control_VeranoEnergy`).
+3. Reemplaza la constante `SPREADSHEET_ID` (cerca del inicio del archivo) por el
+   ID de **esta** planilla nueva — es crítico: si se deja el ID de la planilla de
+   avance, los datos se seguirían escribiendo ahí por error.
+4. Guarda (Cmd/Ctrl+S) y **Implementar → Nueva implementación → Aplicación web**:
+   ejecutar como "Yo", acceso "Cualquier persona". Copia la URL `.../exec`.
+5. Pega esa URL en `js/sync.js` (`DEFAULT_URL`) o en la app, pestaña
+   **Exportar → URL de sincronización**.
+6. Sincroniza un registro de prueba: las hojas `Registros_6.x` /
+   `Indicios_6.1`/`6.2` / `Individuos_6.3` se crean solas en esta planilla nueva.
+
+Si más adelante se actualiza `Codigo.gs` en el repo `Control_VeranoEnergy`, hay
+que replicar el cambio manualmente aquí también (son dos copias independientes
+del mismo script, no un código compartido).
 
 ### 2. PWA (GitHub Pages)
 
