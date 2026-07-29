@@ -2,16 +2,22 @@
 // Cada formulario captura GPS + fotografía georreferenciada del punto principal,
 // más una lista repetible de indicios (6.1/6.2) o individuos (6.3), cada uno con
 // su propio GPS/foto cuando corresponde.
+//
+// Guardar vs. Marcar como listo: "Guardar borrador" nunca valida — así el dato
+// capturado en terreno no se pierde aunque falte un campo, GPS o foto. "Marcar
+// como listo" valida todo y, si falta algo, igual guarda como borrador y muestra
+// qué falta (nunca se pierde lo ya ingresado). Solo lo marcado como listo entra
+// a la cola de sincronización (ver sync.js).
 import * as DB from './db.js';
 import { latLonToUTM } from './utm.js';
 import * as XP from './export.js';
 import * as SYNC from './sync.js';
 import {
-  PROYECTO, RESPONSABLES, TOTAL_UNIDADES,
+  PROYECTO, RESPONSABLES_POR_EDT, OTRA_PERSONA, TOTAL_UNIDADES,
   TIPOS_VEGETACION, ESTADOS_FENOLOGICOS, ESTADOS_SANITARIOS, FORMULARIOS,
 } from './catalog.js';
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const EDTS = ['6.1', '6.2', '6.3'];
 
 const $ = (id) => document.getElementById(id);
@@ -46,7 +52,7 @@ function capturarGPS(btn, accEl) {
         if (accEl) accEl.textContent = `Huso ${utm.huso} · ±${Math.round(accuracy)} m`;
         btn.textContent = '📍 Recapturar GPS';
         toast('Coordenadas capturadas');
-        resolve({ ...utm, accuracy });
+        resolve({ ...utm, accuracy, capturado_en: new Date().toISOString() });
       },
       (err) => {
         btn.textContent = original;
@@ -174,64 +180,101 @@ function wireSubFoto(clone, form, etiqueta) {
   });
 }
 
-function renumerar(cont, tituloSel, prefijo, esIndividuo) {
-  [...cont.children].forEach((el, i) => {
-    if (esIndividuo) {
-      const numero = `G${i + 1}`;
-      el.dataset.numero = numero;
-      el.querySelector(tituloSel).textContent = `${prefijo} ${numero}`;
-    } else {
-      el.querySelector(tituloSel).textContent = `${prefijo} ${i + 1}`;
-    }
-  });
+// Numeración estable: cada contenedor lleva un contador que solo avanza. Si se
+// elimina un ítem, su número NUNCA se reutiliza ni se reasigna a los restantes
+// (ej.: si se elimina G02, el próximo individuo nuevo es G04, no G02 ni G03).
+function siguienteNumero(cont, prefijo) {
+  const n = Number(cont.dataset.next || '1');
+  cont.dataset.next = String(n + 1);
+  return prefijo ? `${prefijo}${n}` : n;
 }
 
-function agregarIndicio(form) {
+function asegurarSiguiente(cont, numero) {
+  const n = typeof numero === 'string' ? parseInt(numero.replace(/\D/g, ''), 10) : numero;
+  if (!Number.isFinite(n)) return;
+  const actual = Number(cont.dataset.next || '1');
+  if (n + 1 > actual) cont.dataset.next = String(n + 1);
+}
+
+function agregarIndicio(form, prefill) {
   const tpl = $('tpl-indicio');
   const clone = tpl.content.firstElementChild.cloneNode(true);
   const cont = form.querySelector('[data-indicios]');
-  clone._gps = null;
+  const numero = prefill ? prefill.numero_indicio : siguienteNumero(cont);
+  if (prefill) asegurarSiguiente(cont, numero);
+  clone.dataset.numero = numero;
+  clone.querySelector('[data-indicio-title]').textContent = `Indicio ${numero}`;
+
+  clone._gps = prefill && prefill.utm_este != null
+    ? { x: prefill.utm_este, y: prefill.utm_norte, huso: prefill.huso, accuracy: prefill.precision_gps, capturado_en: prefill.gps_capturado_en }
+    : null;
+  if (clone._gps) {
+    const accEl = clone.querySelector('[data-gps-acc]');
+    if (accEl) accEl.textContent = `Huso ${clone._gps.huso} · capturado`;
+    clone.querySelector('[data-gps]').textContent = '📍 Recapturar GPS';
+  }
+
   clone._foto = null;
   wireSubGps(clone);
-  wireSubFoto(clone, form, () => {
-    const i = [...cont.children].indexOf(clone) + 1;
-    return `Indicio ${i > 0 ? i : cont.children.length + 1}`;
-  });
-  clone.querySelector('[data-remove]').addEventListener('click', () => {
-    clone.remove();
-    renumerar(cont, '[data-indicio-title]', 'Indicio');
-  });
+  wireSubFoto(clone, form, () => `Indicio ${clone.dataset.numero}`);
+
+  if (prefill) {
+    clone.querySelector('[data-codigo-gps]').value = prefill.codigo_gps_indicio || '';
+    clone.querySelector('[data-observaciones]').value = prefill.observaciones || '';
+    if (prefill.foto) {
+      clone._foto = prefill.foto;
+      clone.querySelector('[data-foto-img]').src = prefill.foto;
+      clone.querySelector('[data-foto-preview]').classList.remove('hidden');
+    }
+  }
+
+  clone.querySelector('[data-remove]').addEventListener('click', () => clone.remove());
   cont.appendChild(clone);
-  renumerar(cont, '[data-indicio-title]', 'Indicio');
 }
 
-function agregarIndividuo(form) {
+function agregarIndividuo(form, prefill) {
   const tpl = $('tpl-individuo');
   const clone = tpl.content.firstElementChild.cloneNode(true);
   const cont = form.querySelector('[data-individuos]');
+  const numero = prefill ? prefill.numero_individuo : siguienteNumero(cont, 'G');
+  if (prefill) asegurarSiguiente(cont, numero);
+  clone.dataset.numero = numero;
+  clone.querySelector('[data-individuo-title]').textContent = `Individuo ${numero}`;
+
   const selFeno = clone.querySelector('[data-fenologico]');
   selFeno.innerHTML = '<option value="">— Seleccionar —</option>';
   ESTADOS_FENOLOGICOS.forEach((v) => selFeno.appendChild(new Option(v, v)));
   const selSani = clone.querySelector('[data-sanitario]');
   selSani.innerHTML = '<option value="">— Seleccionar —</option>';
   ESTADOS_SANITARIOS.forEach((v) => selSani.appendChild(new Option(v, v)));
+
   clone._foto = null;
-  wireSubFoto(clone, form, () => `Individuo ${clone.dataset.numero || ''}`);
-  clone.querySelector('[data-remove]').addEventListener('click', () => {
-    clone.remove();
-    renumerar(cont, '[data-individuo-title]', 'Individuo', true);
-  });
+  wireSubFoto(clone, form, () => `Individuo ${clone.dataset.numero}`);
+
+  if (prefill) {
+    clone.querySelector('[data-profundidad]').value = prefill.profundidad_cm ?? '';
+    selFeno.value = prefill.estado_fenologico || '';
+    selSani.value = prefill.estado_sanitario || '';
+    if (prefill.foto) {
+      clone._foto = prefill.foto;
+      clone.querySelector('[data-foto-img]').src = prefill.foto;
+      clone.querySelector('[data-foto-preview]').classList.remove('hidden');
+    }
+  }
+
+  clone.querySelector('[data-remove]').addEventListener('click', () => clone.remove());
   cont.appendChild(clone);
-  renumerar(cont, '[data-individuo-title]', 'Individuo', true);
 }
 
 // ---------- Recolección de datos al guardar ----------
 function recolectarIndicios(form) {
-  return [...form.querySelectorAll('[data-indicios] [data-indicio-item]')].map((el, i) => ({
-    numero_indicio: i + 1,
+  return [...form.querySelectorAll('[data-indicios] [data-indicio-item]')].map((el) => ({
+    numero_indicio: Number(el.dataset.numero),
     utm_este: el._gps?.x ?? null,
     utm_norte: el._gps?.y ?? null,
     huso: el._gps?.huso ?? null,
+    precision_gps: el._gps?.accuracy ?? null,
+    gps_capturado_en: el._gps?.capturado_en ?? null,
     codigo_gps_indicio: el.querySelector('[data-codigo-gps]').value.trim(),
     foto: el._foto || null,
     observaciones: el.querySelector('[data-observaciones]').value.trim(),
@@ -248,100 +291,147 @@ function recolectarIndividuos(form) {
   }));
 }
 
-// ---------- Guardar ----------
-async function guardar(e) {
-  e.preventDefault();
-  const form = e.target;
+// ---------- Validación completa (solo para "Marcar como listo") ----------
+function faltantesComunes(get, form) {
+  const faltan = [];
+  if (!get('zona')) faltan.push('Zona');
+  if (!get('fecha')) faltan.push('Fecha');
+  const evaluadora = get('evaluadora');
+  if (!evaluadora) faltan.push('Persona evaluadora');
+  else if (evaluadora === OTRA_PERSONA && !get('evaluadora_otra')) faltan.push('Nombre de la persona evaluadora ("Otra")');
+  const numeroTxt = get('numero_unidad');
+  const numero = Number(numeroTxt);
+  if (!numeroTxt || !Number.isInteger(numero) || numero < 1 || numero > TOTAL_UNIDADES) {
+    faltan.push(`N° de unidad (entero entre 1 y ${TOTAL_UNIDADES})`);
+  }
+  if (!form._gpsMain) faltan.push('Punto GPS');
+  return faltan;
+}
+
+function faltantesEspecificos(edt, get, form) {
+  const faltan = [];
+  if (edt === '6.1') {
+    if (!get('presencia_vegetacion_acompanante')) faltan.push('Vegetación acompañante');
+    if (!get('presencia_curureras')) faltan.push('Presencia de curureras');
+  } else if (edt === '6.2') {
+    if (!get('tipo_vegetacion')) faltan.push('Tipo de vegetación');
+    if (get('tipo_vegetacion').startsWith('Otro') && !get('tipo_vegetacion_otro')) faltan.push('Especificar tipo de vegetación "Otro"');
+    if (!get('presencia_curureras')) faltan.push('Presencia de curureras');
+  } else {
+    const presencia = get('presencia_geofita');
+    if (!presencia) faltan.push('Presencia de geófita');
+    else if (presencia === 'Sí' && recolectarIndividuos(form).length === 0) faltan.push('Al menos un individuo (hay presencia de geófita)');
+  }
+  return faltan;
+}
+
+// ---------- Guardar (borrador o marcar como listo) ----------
+async function guardarRegistro(form, { marcarListo }) {
   const edt = form.dataset.edt;
   const cfg = FORMULARIOS[edt];
   const get = (name) => (form.querySelector(`[data-f="${name}"]`)?.value || '').trim();
 
-  const zona = get('zona');
-  const fecha = get('fecha');
+  const faltantes = marcarListo ? [...faltantesComunes(get, form), ...faltantesEspecificos(edt, get, form)] : [];
+  const completo = faltantes.length === 0;
+
   const evaluadora = get('evaluadora');
-  const numero_unidad = Number(get('numero_unidad'));
+  const evaluadora_otra = evaluadora === OTRA_PERSONA ? get('evaluadora_otra') : '';
+  const persona_evaluadora_final = evaluadora === OTRA_PERSONA ? evaluadora_otra : evaluadora;
+  const numero_unidad = get('numero_unidad') ? Number(get('numero_unidad')) : null;
 
-  if (!zona || !fecha || !evaluadora) { toast('Completa zona, fecha y evaluadora'); return; }
-  if (!numero_unidad || !Number.isInteger(numero_unidad) || numero_unidad < 1 || numero_unidad > TOTAL_UNIDADES) {
-    toast(`El N° de ${cfg.unidad_singular.toLowerCase()} debe ser un entero entre 1 y ${TOTAL_UNIDADES}`);
-    return;
-  }
-  if (!form._gpsMain) { toast('Captura el punto GPS antes de guardar'); return; }
-
-  const usados = await DB.numerosUsados(edt);
-  if (usados.has(numero_unidad)) {
-    toast(`Atención: ya existe un registro para ${cfg.unidad_singular} ${numero_unidad}. Revisa que no sea un duplicado.`);
-  }
+  const todosEdt = await DB.getRegistros(edt);
+  const original = form._editId ? todosEdt.find((r) => r.id === form._editId) : null;
+  const duplicado = numero_unidad != null && todosEdt.some((r) => r.numero_unidad === numero_unidad && r.id !== form._editId);
 
   const base = {
-    record_id: `${edt}-${crypto.randomUUID()}`,
+    record_id: form._recordId || `${edt}-${crypto.randomUUID()}`,
     proyecto_id: PROYECTO.project_id,
     nombre_proyecto: PROYECTO.nombre_proyecto,
     codigo_edt: edt,
-    zona, fecha, evaluadora, numero_unidad,
-    utm_este: form._gpsMain.x,
-    utm_norte: form._gpsMain.y,
-    huso: form._gpsMain.huso,
+    zona: get('zona'),
+    fecha: get('fecha'),
+    evaluadora: persona_evaluadora_final,
+    persona_evaluadora: evaluadora,
+    persona_evaluadora_otra: evaluadora_otra,
+    persona_evaluadora_final,
+    numero_unidad,
+    utm_este: form._gpsMain?.x ?? null,
+    utm_norte: form._gpsMain?.y ?? null,
+    huso: form._gpsMain?.huso ?? null,
+    precision_gps: form._gpsMain?.accuracy ?? null,
+    gps_capturado_en: form._gpsMain?.capturado_en ?? null,
     foto: form._fotoMain || null,
     observaciones: get('observaciones'),
-    estado_sincronizacion: 'Pendiente',
+    estado_sync: completo && marcarListo ? 'PENDIENTE' : 'BORRADOR',
+    estado_sincronizacion: completo && marcarListo ? 'Pendiente' : 'Borrador',
+    sincronizado: 0,
     fecha_sincronizacion: null,
   };
+  if (original) base.fecha_creacion = original.fecha_creacion;
 
   let reg;
   if (edt === '6.1') {
-    const presencia_vegetacion_acompanante = get('presencia_vegetacion_acompanante');
-    const presencia_curureras = get('presencia_curureras');
-    if (!presencia_vegetacion_acompanante || !presencia_curureras) {
-      toast('Indica presencia de vegetación acompañante y de curureras'); return;
-    }
     reg = {
       ...base,
       codigo_gps_zona: get('codigo_gps_zona'),
-      presencia_vegetacion_acompanante,
-      presencia_curureras,
+      presencia_vegetacion_acompanante: get('presencia_vegetacion_acompanante'),
+      presencia_curureras: get('presencia_curureras'),
       indicios: recolectarIndicios(form),
     };
   } else if (edt === '6.2') {
-    const tipo_vegetacion = get('tipo_vegetacion');
-    const presencia_curureras = get('presencia_curureras');
-    if (!tipo_vegetacion || !presencia_curureras) { toast('Completa tipo de vegetación y presencia de curureras'); return; }
     reg = {
       ...base,
       codigo_gps_parcela: get('codigo_gps_parcela'),
-      tipo_vegetacion,
+      tipo_vegetacion: get('tipo_vegetacion'),
       tipo_vegetacion_otro: get('tipo_vegetacion_otro'),
       especies: get('especies'),
-      presencia_curureras,
+      presencia_curureras: get('presencia_curureras'),
       indicios: recolectarIndicios(form),
     };
   } else {
-    const presencia_geofita = get('presencia_geofita');
-    if (!presencia_geofita) { toast('Indica si hay presencia de geófita'); return; }
-    const individuos = recolectarIndividuos(form);
-    if (presencia_geofita === 'Sí' && individuos.length === 0) {
-      toast('Agrega al menos un individuo, ya que hay presencia de geófita'); return;
-    }
     reg = {
       ...base,
       codigo_gps_calicata: get('codigo_gps_calicata'),
-      presencia_geofita,
-      individuos,
+      presencia_geofita: get('presencia_geofita'),
+      individuos: recolectarIndividuos(form),
     };
   }
 
-  await DB.addRegistro(edt, reg);
-  toast(`Guardado: ${cfg.unidad_singular} ${numero_unidad}`);
+  if (form._editId) {
+    reg.id = form._editId;
+    await DB.updateRegistro(edt, reg);
+  } else {
+    await DB.addRegistro(edt, reg);
+  }
+
+  const faltantesMsg = (marcarListo && !completo) ? `Guardado como borrador — falta: ${faltantes.join(', ')}.` : null;
+  const numeroTxt = numero_unidad ?? '';
+
   form.reset(); // dispara 'reset' -> limpiarExtras() hace el resto (GPS, fotos, indicios/individuos)
+  setTimeout(() => {
+    const faltantesEl = form.querySelector('[data-faltantes]');
+    if (faltantesEl && faltantesMsg) {
+      faltantesEl.textContent = faltantesMsg;
+      faltantesEl.classList.remove('hidden');
+    }
+  }, 0);
+
+  if (faltantesMsg) toast('Faltan datos: guardado como borrador');
+  else if (duplicado) toast(`Atención: ya existe un registro para ${cfg.unidad_singular} ${numeroTxt}. Revisa que no sea un duplicado.`);
+  else toast(marcarListo ? `Listo para sincronizar: ${cfg.unidad_singular} ${numeroTxt}` : `Borrador guardado: ${cfg.unidad_singular} ${numeroTxt}`);
+
   await refrescarLista(edt);
   await actualizarStats();
 }
 
 // Limpieza de todo lo que el reset nativo del <form> no cubre: estado en memoria
-// (GPS/foto principal), bloques repetibles de indicios/individuos, y la fecha por defecto.
+// (GPS/foto principal), bloques repetibles de indicios/individuos, contexto de
+// edición de borrador, y la fecha por defecto.
 function limpiarExtras(form) {
   form._gpsMain = null;
   form._fotoMain = null;
+  form._editId = null;
+  form._recordId = null;
   const accMain = form.querySelector('[data-gps-acc]');
   if (accMain) accMain.textContent = '';
   const btnGpsMain = form.querySelector('[data-gps-main]');
@@ -349,22 +439,104 @@ function limpiarExtras(form) {
   const previewMain = form.querySelector('[data-foto-preview-main]');
   if (previewMain) previewMain.classList.add('hidden');
   const indicios = form.querySelector('[data-indicios]');
-  if (indicios) indicios.innerHTML = '';
+  if (indicios) { indicios.innerHTML = ''; delete indicios.dataset.next; }
   const individuos = form.querySelector('[data-individuos]');
-  if (individuos) individuos.innerHTML = '';
+  if (individuos) { individuos.innerHTML = ''; delete individuos.dataset.next; }
   const otroWrap = form.querySelector('[data-otro-vegetacion-wrap]');
   if (otroWrap) otroWrap.classList.add('hidden');
+  const otraEvalWrap = form.querySelector('[data-otra-evaluadora-wrap]');
+  if (otraEvalWrap) otraEvalWrap.classList.add('hidden');
+  const faltantesEl = form.querySelector('[data-faltantes]');
+  if (faltantesEl) faltantesEl.classList.add('hidden');
   form.querySelector('[data-f="fecha"]').value = new Date().toISOString().slice(0, 10);
+}
+
+// ---------- Continuar un borrador (recarga sus datos en el formulario) ----------
+function cargarEnFormulario(edt, reg) {
+  const form = formDe(edt);
+  form.reset();
+  setTimeout(() => {
+    form._editId = reg.id;
+    form._recordId = reg.record_id;
+
+    const set = (name, value) => {
+      const el = form.querySelector(`[data-f="${name}"]`);
+      if (el) el.value = value ?? '';
+    };
+    set('zona', reg.zona);
+    set('fecha', reg.fecha);
+    set('numero_unidad', reg.numero_unidad);
+    set('observaciones', reg.observaciones);
+
+    const selEval = form.querySelector('[data-f="evaluadora"]');
+    selEval.value = reg.persona_evaluadora || reg.evaluadora || '';
+    if (selEval.value === OTRA_PERSONA) {
+      const wrap = form.querySelector('[data-otra-evaluadora-wrap]');
+      wrap.classList.remove('hidden');
+      set('evaluadora_otra', reg.persona_evaluadora_otra);
+    }
+
+    if (edt === '6.1') {
+      set('codigo_gps_zona', reg.codigo_gps_zona);
+      set('presencia_vegetacion_acompanante', reg.presencia_vegetacion_acompanante);
+      set('presencia_curureras', reg.presencia_curureras);
+    } else if (edt === '6.2') {
+      set('codigo_gps_parcela', reg.codigo_gps_parcela);
+      set('tipo_vegetacion', reg.tipo_vegetacion);
+      if ((reg.tipo_vegetacion || '').startsWith('Otro')) {
+        form.querySelector('[data-otro-vegetacion-wrap]').classList.remove('hidden');
+        set('tipo_vegetacion_otro', reg.tipo_vegetacion_otro);
+      }
+      set('especies', reg.especies);
+      set('presencia_curureras', reg.presencia_curureras);
+    } else {
+      set('codigo_gps_calicata', reg.codigo_gps_calicata);
+      set('presencia_geofita', reg.presencia_geofita);
+    }
+
+    if (reg.utm_este != null && reg.utm_norte != null) {
+      form._gpsMain = { x: reg.utm_este, y: reg.utm_norte, huso: reg.huso, accuracy: reg.precision_gps, capturado_en: reg.gps_capturado_en };
+      form.querySelector('[data-f="utm_este"]').value = reg.utm_este;
+      form.querySelector('[data-f="utm_norte"]').value = reg.utm_norte;
+      const accEl = form.querySelector('[data-gps-acc]');
+      if (accEl) accEl.textContent = reg.precision_gps != null ? `Huso ${reg.huso} · ±${Math.round(reg.precision_gps)} m` : `Huso ${reg.huso} · capturado`;
+      const btnGps = form.querySelector('[data-gps-main]');
+      if (btnGps) btnGps.textContent = '📍 Recapturar GPS';
+    }
+
+    if (reg.foto) {
+      form._fotoMain = reg.foto;
+      form.querySelector('[data-foto-img-main]').src = reg.foto;
+      form.querySelector('[data-foto-preview-main]').classList.remove('hidden');
+    }
+
+    if (edt === '6.3') (reg.individuos || []).forEach((ind) => agregarIndividuo(form, ind));
+    else (reg.indicios || []).forEach((ind) => agregarIndicio(form, ind));
+
+    // Ir al sub-tab "Nuevo" de este EDT.
+    const sec = seccionDe(edt);
+    sec.querySelectorAll('.subtab').forEach((t) => t.classList.toggle('active', t.dataset.sub === 'form'));
+    sec.querySelectorAll(':scope > .subview').forEach((v) => v.classList.toggle('active', v.dataset.sub === 'form'));
+    document.querySelectorAll('.tabs > .tab').forEach((t) => t.classList.toggle('active', t.dataset.view === 'edt' + edt.replace('.', '')));
+    document.querySelectorAll('main > .view').forEach((v) => v.classList.toggle('active', v === sec));
+    sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    toast(`Editando borrador: ${tituloRegistro(edt, reg)}`);
+  }, 0);
 }
 
 // ---------- Listas ----------
 function tituloRegistro(edt, r) {
-  return `${FORMULARIOS[edt].unidad_singular} ${r.numero_unidad}`;
+  return `${FORMULARIOS[edt].unidad_singular} ${r.numero_unidad ?? '(sin número)'}`;
 }
 
 function subInfo(edt, r) {
   if (edt === '6.3') return `${r.individuos?.length || 0} individuo(s)`;
   return `${r.indicios?.length || 0} indicio(s)`;
+}
+
+function etiquetaEstado(r) {
+  if (r.estado_sync === 'BORRADOR') return 'Borrador';
+  return r.estado_sincronizacion || 'Pendiente';
 }
 
 async function refrescarLista(edt) {
@@ -378,19 +550,24 @@ async function refrescarLista(edt) {
   sec.querySelector('[data-empty]').style.display = regs.length ? 'none' : 'block';
 
   for (const r of regs) {
+    const esBorrador = r.estado_sync === 'BORRADOR';
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = `
       <div class="card-main">
-        <strong>${tituloRegistro(edt, r)}</strong> — ${r.zona}
-        <span class="tag">${r.estado_sincronizacion || 'Pendiente'}</span>
+        <strong>${tituloRegistro(edt, r)}</strong> — ${r.zona || '(sin zona)'}
+        <span class="tag">${etiquetaEstado(r)}</span>
         <div class="card-sub">
-          ${r.fecha} · ${r.evaluadora} · ${subInfo(edt, r)}${r.foto ? ' · 📷' : ''}
+          ${r.fecha || '(sin fecha)'} · ${r.persona_evaluadora_final || r.evaluadora || '(sin evaluadora)'} · ${subInfo(edt, r)}${r.foto ? ' · 📷' : ''}
         </div>
       </div>
       <div class="card-actions">
-        <button class="btn-mini danger" data-del>🗑</button>
+        ${esBorrador ? '<button type="button" class="btn-mini" data-continuar>✏️</button>' : ''}
+        <button type="button" class="btn-mini danger" data-del>🗑</button>
       </div>`;
+    if (esBorrador) {
+      card.querySelector('[data-continuar]').addEventListener('click', () => cargarEnFormulario(edt, r));
+    }
     card.querySelector('[data-del]').addEventListener('click', async () => {
       if (confirm(`¿Eliminar el registro de ${tituloRegistro(edt, r)}?`)) {
         await DB.deleteRegistro(edt, r.id);
@@ -415,9 +592,19 @@ async function refrescarTodasLasListas() {
 
 // ---------- Catálogos base por formulario ----------
 function cargarCatalogosBase() {
-  document.querySelectorAll('[data-f="evaluadora"]').forEach((sel) => {
-    sel.innerHTML = '<option value="" disabled selected>— Seleccionar —</option>';
-    RESPONSABLES.forEach((n) => sel.appendChild(new Option(n, n)));
+  document.querySelectorAll('.reg-form').forEach((form) => {
+    const edt = form.dataset.edt;
+    const sel = form.querySelector('[data-f="evaluadora"]');
+    if (sel) {
+      sel.innerHTML = '<option value="" disabled selected>— Seleccionar —</option>';
+      (RESPONSABLES_POR_EDT[edt] || []).forEach((n) => sel.appendChild(new Option(n, n)));
+      sel.addEventListener('change', () => {
+        const wrap = form.querySelector('[data-otra-evaluadora-wrap]');
+        const esOtra = sel.value === OTRA_PERSONA;
+        wrap.classList.toggle('hidden', !esOtra);
+        if (!esOtra) form.querySelector('[data-f="evaluadora_otra"]').value = '';
+      });
+    }
   });
 
   const selVeg = document.querySelector('[data-f="tipo_vegetacion"]');
@@ -425,8 +612,11 @@ function cargarCatalogosBase() {
     selVeg.innerHTML = '<option value="" disabled selected>— Seleccionar —</option>';
     TIPOS_VEGETACION.forEach((v) => selVeg.appendChild(new Option(v, v)));
     selVeg.addEventListener('change', () => {
-      const wrap = selVeg.closest('form').querySelector('[data-otro-vegetacion-wrap]');
-      wrap.classList.toggle('hidden', !selVeg.value.startsWith('Otro'));
+      const form = selVeg.closest('form');
+      const wrap = form.querySelector('[data-otro-vegetacion-wrap]');
+      const esOtro = selVeg.value.startsWith('Otro');
+      wrap.classList.toggle('hidden', !esOtro);
+      if (!esOtro) form.querySelector('[data-f="tipo_vegetacion_otro"]').value = '';
     });
   }
 }
@@ -484,7 +674,9 @@ async function init() {
     form.querySelector('[data-f="fecha"]').value = new Date().toISOString().slice(0, 10);
     wireMainGps(form);
     wireMainFoto(form);
-    form.addEventListener('submit', guardar);
+    form.addEventListener('submit', (e) => { e.preventDefault(); guardarRegistro(form, { marcarListo: true }); });
+    const btnBorrador = form.querySelector('[data-guardar-borrador]');
+    if (btnBorrador) btnBorrador.addEventListener('click', () => guardarRegistro(form, { marcarListo: false }));
     form.addEventListener('reset', () => setTimeout(() => limpiarExtras(form), 0));
 
     const addIndicio = form.querySelector('[data-add-indicio]');
@@ -506,7 +698,7 @@ async function init() {
       const r = await SYNC.sincronizar((n, t) => { $('sync-info').textContent = `Enviando ${n}/${t}…`; });
       $('sync-info').textContent = r.enviados
         ? `✅ ${r.enviados} registro(s) sincronizado(s).`
-        : 'Todo al día, no hay pendientes.';
+        : 'Todo al día, no hay pendientes (los borradores no se sincronizan).';
       toast('Sincronización completa');
       await refrescarTodasLasListas();
     } catch (err) {

@@ -74,7 +74,8 @@ export async function sincronizar(onProgress) {
   let total = 0;
   for (const edt of EDTS) {
     const todos = await DB.getRegistros(edt);
-    const pend = todos.filter((r) => !r.sincronizado);
+    // Los borradores nunca se sincronizan: solo registros ya marcados como listos.
+    const pend = todos.filter((r) => !r.sincronizado && r.estado_sync !== 'BORRADOR');
     pendientesPorEdt[edt] = pend;
     total += pend.length;
   }

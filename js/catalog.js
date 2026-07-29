@@ -8,13 +8,15 @@ export const PROYECTO = {
   huso_utm: '19S',
 };
 
-// Evaluadoras/responsables autorizadas — mismo catálogo que el formulario de avance.
-export const RESPONSABLES = [
-  'Juan Araya',
-  'Bárbara Aros',
-  'Sabina Madariaga',
-  'María Paz Quiroz',
-];
+// Catálogos de "Persona evaluadora" — diferenciados por EDT. Juan Araya solo
+// participa en calicatas (6.3); no debe poder seleccionarse en 6.1/6.2.
+export const OTRA_PERSONA = 'Otra persona';
+
+export const RESPONSABLES_POR_EDT = {
+  '6.1': ['Sabina Madariaga', 'Bárbara Aros', 'María Paz Quiroz', OTRA_PERSONA],
+  '6.2': ['Sabina Madariaga', 'Bárbara Aros', 'María Paz Quiroz', OTRA_PERSONA],
+  '6.3': ['Sabina Madariaga', 'Bárbara Aros', 'Juan Araya', 'María Paz Quiroz', OTRA_PERSONA],
+};
 
 // Cantidad total de unidades por EDT (1 por hectárea → 177).
 export const TOTAL_UNIDADES = 177;

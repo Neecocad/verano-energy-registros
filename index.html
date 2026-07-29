@@ -35,7 +35,7 @@
       </nav>
 
       <div class="subview active" data-sub="form">
-        <form class="reg-form" data-edt="6.1" autocomplete="off">
+        <form class="reg-form" data-edt="6.1" autocomplete="off" novalidate>
           <fieldset>
             <legend>Zona y transecto</legend>
             <label>Zona
@@ -45,10 +45,13 @@
               <label>Fecha
                 <input type="date" data-f="fecha" required />
               </label>
-              <label>Evaluadora
+              <label>Persona evaluadora
                 <select data-f="evaluadora" required></select>
               </label>
             </div>
+            <label class="hidden" data-otra-evaluadora-wrap>Especificar persona evaluadora
+              <input type="text" data-f="evaluadora_otra" />
+            </label>
             <label>N° de transecto (1–177)
               <input type="number" data-f="numero_unidad" min="1" max="177" step="1" inputmode="numeric" required />
             </label>
@@ -118,8 +121,12 @@
           </fieldset>
 
           <div class="actions">
-            <button type="submit" class="btn-primary">💾 Guardar registro</button>
-            <button type="reset" class="btn-ghost">Limpiar</button>
+            <button type="submit" class="btn-primary">✅ Marcar como listo</button>
+            <button type="button" class="btn-ghost" data-guardar-borrador>💾 Guardar borrador</button>
+          </div>
+          <p class="hint warn hidden" data-faltantes></p>
+          <div class="actions">
+            <button type="reset" class="btn-ghost">Limpiar formulario</button>
           </div>
         </form>
       </div>
@@ -138,7 +145,7 @@
       </nav>
 
       <div class="subview active" data-sub="form">
-        <form class="reg-form" data-edt="6.2" autocomplete="off">
+        <form class="reg-form" data-edt="6.2" autocomplete="off" novalidate>
           <fieldset>
             <legend>Parcela</legend>
             <label>Código de zona
@@ -148,10 +155,13 @@
               <label>Fecha
                 <input type="date" data-f="fecha" required />
               </label>
-              <label>Evaluadora
+              <label>Persona evaluadora
                 <select data-f="evaluadora" required></select>
               </label>
             </div>
+            <label class="hidden" data-otra-evaluadora-wrap>Especificar persona evaluadora
+              <input type="text" data-f="evaluadora_otra" />
+            </label>
             <label>N° de parcela (1–177)
               <input type="number" data-f="numero_unidad" min="1" max="177" step="1" inputmode="numeric" required />
             </label>
@@ -221,8 +231,12 @@
           </fieldset>
 
           <div class="actions">
-            <button type="submit" class="btn-primary">💾 Guardar registro</button>
-            <button type="reset" class="btn-ghost">Limpiar</button>
+            <button type="submit" class="btn-primary">✅ Marcar como listo</button>
+            <button type="button" class="btn-ghost" data-guardar-borrador>💾 Guardar borrador</button>
+          </div>
+          <p class="hint warn hidden" data-faltantes></p>
+          <div class="actions">
+            <button type="reset" class="btn-ghost">Limpiar formulario</button>
           </div>
         </form>
       </div>
@@ -241,7 +255,7 @@
       </nav>
 
       <div class="subview active" data-sub="form">
-        <form class="reg-form" data-edt="6.3" autocomplete="off">
+        <form class="reg-form" data-edt="6.3" autocomplete="off" novalidate>
           <fieldset>
             <legend>Calicata</legend>
             <label>Zona
@@ -251,10 +265,13 @@
               <label>Fecha
                 <input type="date" data-f="fecha" required />
               </label>
-              <label>Evaluadora
+              <label>Persona evaluadora
                 <select data-f="evaluadora" required></select>
               </label>
             </div>
+            <label class="hidden" data-otra-evaluadora-wrap>Especificar persona evaluadora
+              <input type="text" data-f="evaluadora_otra" />
+            </label>
             <label>N° de calicata (1–177)
               <input type="number" data-f="numero_unidad" min="1" max="177" step="1" inputmode="numeric" required />
             </label>
@@ -311,8 +328,12 @@
           </fieldset>
 
           <div class="actions">
-            <button type="submit" class="btn-primary">💾 Guardar registro</button>
-            <button type="reset" class="btn-ghost">Limpiar</button>
+            <button type="submit" class="btn-primary">✅ Marcar como listo</button>
+            <button type="button" class="btn-ghost" data-guardar-borrador>💾 Guardar borrador</button>
+          </div>
+          <p class="hint warn hidden" data-faltantes></p>
+          <div class="actions">
+            <button type="reset" class="btn-ghost">Limpiar formulario</button>
           </div>
         </form>
       </div>
