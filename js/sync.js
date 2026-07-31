@@ -38,9 +38,10 @@ function camposRegistro(edt) {
 function filaRegistro(edt, reg) {
   const fila = {};
   camposRegistro(edt).forEach((c) => { fila[c] = reg[c] ?? null; });
-  // Registros de la versión anterior guardaban las especies como texto libre;
-  // se envía aparte para no perderlo (los nuevos lo dejan vacío).
-  if (edt === '6.2') fila.especies_texto_legado = typeof reg.especies === 'string' ? reg.especies : '';
+  // Registros de la versión anterior guardaban las especies como texto libre en
+  // `especies`; se mantiene esa columna para no perderlos. En los registros
+  // nuevos las especies son elementos y viajan en el detalle, así que va vacía.
+  if (edt === '6.2') fila.especies = typeof reg.especies === 'string' ? reg.especies : '';
   return fila;
 }
 

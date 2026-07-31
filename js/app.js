@@ -11,7 +11,7 @@ import {
   TIPOS_VEGETACION, TIPOS_INDICIO, ESTADOS_FENOLOGICOS, ESTADOS_SANITARIOS, FORMULARIOS,
 } from './catalog.js';
 import {
-  nuevoUUID, codigoParcela, codigoElemento, etiquetaElemento,
+  nuevoUUID, codigoParcela, codigoElemento, etiquetaElemento, zonaANumero,
   TIPO_FILA_ESPECIE, TIPO_FILA_INDICIO,
 } from './codigos.js';
 
@@ -293,7 +293,17 @@ function refrescarCodigoParcela(form) {
 
   if (!form._codigoParcela) {
     campo.value = vigente || '';
-    aviso.classList.add('hidden');
+    // La zona es texto libre: si lo escrito no trae ningún número no se puede
+    // formar el prefijo Z{nn} y conviene decirlo antes de agregar elementos.
+    const zona = form.querySelector('[data-f="zona"]').value.trim();
+    const numero = form.querySelector('[data-f="numero_unidad"]').value;
+    if (!vigente && zona && numero && zonaANumero(zona) === null) {
+      aviso.textContent = `La zona «${zona}» no tiene ningún número, así que todavía no se puede generar el código. `
+        + 'Escríbela con su número (por ejemplo «Zona 3» o «3»).';
+      aviso.classList.remove('hidden');
+    } else {
+      aviso.classList.add('hidden');
+    }
     return;
   }
 
@@ -323,7 +333,10 @@ function refrescarResumenElementos(form) {
 function agregarElemento(form, tipoFila) {
   const cod = form._codigoParcela || codigoParcelaVigente(form);
   if (!cod) {
-    toast('Ingresa la zona y el N° de parcela antes de agregar elementos');
+    const zona = form.querySelector('[data-f="zona"]').value.trim();
+    toast(zona && zonaANumero(zona) === null
+      ? 'La zona debe incluir un número (ej: «Zona 3») para generar el código'
+      : 'Ingresa la zona y el N° de parcela antes de agregar elementos');
     return;
   }
   form._codigoParcela = cod; // congelado desde el primer elemento
@@ -519,7 +532,10 @@ async function guardar(e) {
     if (!tipo_vegetacion || !presencia_curureras) { toast('Completa tipo de vegetación y presencia de curureras'); return; }
 
     const codigo_parcela = form._codigoParcela || codigoParcelaVigente(form);
-    if (!codigo_parcela) { toast('No se pudo generar el código de la parcela: revisa la zona y el N° de parcela'); return; }
+    if (!codigo_parcela) {
+      toast('Para generar el código de la parcela, la zona debe incluir un número (ej: «Zona 3»)');
+      return;
+    }
 
     const { especies, indicios } = recolectarElementos(form);
     const error = validarElementos({ especies, indicios });

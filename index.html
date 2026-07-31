@@ -144,8 +144,8 @@
         <form class="reg-form" data-edt="6.2" autocomplete="off">
           <fieldset>
             <legend>Parcela</legend>
-            <label>Zona (N°)
-              <input type="number" data-f="zona" min="1" max="99" step="1" inputmode="numeric" required />
+            <label>Zona
+              <input type="text" data-f="zona" required />
             </label>
             <div class="grid-2">
               <label>Fecha
@@ -164,6 +164,7 @@
             <label>Código de la parcela (automático)
               <input type="text" data-codigo-parcela readonly placeholder="Z01-P001" />
             </label>
+            <p class="hint">Se arma con el número de la zona y el de la parcela, así que la zona debe incluir un número: «3», «Zona 3» y «Z3» sirven igual.</p>
             <p class="hint hidden warn" data-codigo-parcela-warn></p>
           </fieldset>
 

@@ -98,6 +98,12 @@ ambos: `parcela_id` (UUID técnico inmutable) y `codigo_parcela` (código visibl
 código se genera localmente en la PWA, sin internet, en cuanto existen zona y N°
 de parcela, y queda congelado al crearse el primer elemento.
 
+La zona es texto libre en los 3 formularios, así que el número del prefijo `Z`
+se extrae de lo escrito: «3», «Zona 3» y «Z3» dan igual `Z03`. Si el texto no
+tiene ningún número no se puede formar el código, y el formulario lo avisa y no
+deja crear elementos hasta corregirlo (un elemento sin código de parcela no
+tendría cómo armar su propio `codigo_elemento`).
+
 Cada elemento de "Elementos encontrados" lleva `elemento_id` (UUID),
 `tipo_fila` (`ESPECIE` o `INDICIO`, asignado por la app según el botón que se
 presionó — no hay ningún campo `tipo_fila` editable), `numero_elemento` y
@@ -134,14 +140,28 @@ Al sincronizar, el Apps Script crea (si no existen) y hace upsert idempotente po
 - **Registros_6.2** / **Elementos_6.2**
 - **Registros_6.3** / **Individuos_6.3**
 
-### ⚠️ Elementos_6.2 requiere actualizar el Apps Script
+### Elementos_6.2 y actualización del Apps Script
 
 El detalle de 6.2 dejó de ser solo indicios: ahora son **elementos** (especies +
-indicios) y van a la hoja **Elementos_6.2**, no a `Indicios_6.2`. El payload de
-sincronización incluye `hoja_detalle` con el nombre de la hoja de destino, así que
-`Codigo.gs` debe leer ese campo (o mapear `6.2 → Elementos_6.2`) en vez de asumir
-`Indicios_6.x`. Mientras no se actualice, los registros 6.2 nuevos seguirán
-escribiéndose en la hoja antigua con columnas que no calzan.
+indicios) y van a la hoja **Elementos_6.2**, no a `Indicios_6.2` (que se conserva
+intacta con los datos históricos, porque tenía otro esquema de columnas).
+
+`apps-script/Codigo.gs` del repo `Control_VeranoEnergy` ya está actualizado para
+esto, pero recuerda que el deployment que usa esta PWA es una **copia** con su
+propio `SPREADSHEET_ID`: hay que **pegar de nuevo el script y volver a implementar**
+esa copia para que los cambios tomen efecto (ver "Despliegue" más abajo).
+
+La actualización de esa copia incluye una migración automática: el script lee el
+encabezado real de cada hoja y agrega al final las columnas que falten, sin mover
+ni reordenar las que ya tienen datos. Las filas históricas de `Registros_6.2` se
+mantienen tal cual y solo ganan cuatro columnas nuevas (`parcela_id`,
+`codigo_parcela`, `ultimo_numero_especie`, `ultimo_numero_indicio`).
+
+Las fotos del detalle pasaron a nombrarse por el código o el número estable del
+ítem (`{record_id}_Z01-P001-E01.jpg`) en vez de por su posición en la lista, para
+que borrar un elemento no reasigne las fotos de los demás en Drive. Un registro
+antiguo que se resincronice creará el archivo con el nombre nuevo; el anterior
+queda en Drive y se puede borrar a mano.
 
 Cada especie y cada indicio produce **una fila independiente**; las columnas
 propias de un tipo quedan vacías en las filas del otro, y no se combinan ni se
@@ -190,7 +210,12 @@ otra cuenta, se crea una carpeta base independiente.
 
 Si más adelante se actualiza `Codigo.gs` en el repo `Control_VeranoEnergy`, hay
 que replicar el cambio manualmente aquí también (son dos copias independientes
-del mismo script, no un código compartido).
+del mismo script, no un código compartido). Para replicarlo: abre la planilla de
+registros → **Extensiones → Apps Script**, pega el archivo completo, guarda, y
+**Implementar → Administrar implementaciones → editar (✏️) → Versión: Nueva
+versión → Implementar**. Editar la implementación existente conserva la misma URL
+`/exec`, así que no hay que volver a tocarla en la app. Con la copia actualizada,
+el primer sync crea sola la hoja `Elementos_6.2`.
 
 ### 2. PWA (GitHub Pages)
 
