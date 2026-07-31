@@ -30,7 +30,9 @@
  */
 
 // ⚠️ ÚNICO valor que hay que cambiar para apuntar a otra planilla.
-const SPREADSHEET_ID = 'PEGA_AQUI_EL_ID_DE_LA_PLANILLA';
+// Planilla "Verano Energy" (la que también recibe el avance agregado del repo
+// Control_VeranoEnergy: son hojas distintas dentro del mismo archivo).
+const SPREADSHEET_ID = '1YjNRN66YVn0t7dYsEyp4rIe3mSsIlMyVQMao3VQ5m6U';
 
 const PROYECTO_ID = 'VERANO_ENERGY';
 const NOMBRE_PROYECTO = 'Verano Energy';

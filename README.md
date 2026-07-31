@@ -8,10 +8,11 @@ propio **punto GPS** y **fotografía georreferenciada**.
 Es el complemento del formulario de **avance agregado**
 ([Control_VeranoEnergy](https://github.com/Neecocad/Control_VeranoEnergy)): aquel
 registra cuánto se avanzó cada día (sin foto ni GPS), este registra **el detalle de
-cada unidad** levantada en terreno. Cada app sincroniza contra **su propia
-planilla** de Google Sheets — son dos planillas y dos backends de Apps Script
-independientes (no se cruzan datos automáticamente entre avance agregado y
-detalle por unidad; ver "Próximos pasos" en el README de `Control_VeranoEnergy`).
+cada unidad** levantada en terreno. Las dos apps escriben en **la misma planilla**
+de Google Sheets, en hojas distintas, con un backend de Apps Script independiente
+cada una (ver "Una planilla, dos apps"). Los datos conviven en el mismo archivo,
+pero no se cruzan solos: nada relaciona automáticamente una jornada de avance con
+las unidades levantadas ese día.
 
 ## Qué registra cada formulario
 
@@ -52,13 +53,26 @@ guarda en `evaluadora` y el que llega a la planilla y al geo-sello.
   (`js/utm.js`), y estampado de texto (proyecto, EDT, evaluadora, fecha, UTM) sobre
   la foto vía Canvas antes de guardarla.
 - **Sincronización manual** contra un Web App de Apps Script **propio**
-  (`apps-script/Codigo.gs`, en este mismo repo), desplegado sobre su **propia
-  planilla** de Google Sheets, independiente de la que usa Control_VeranoEnergy.
-  Antes era una copia sin versionar del script de aquel repo, con la constante
-  `SPREADSHEET_ID` cambiada a mano; ahora cada app lleva el suyo y solo hay que
-  editar esa constante. Este script atiende únicamente
-  `tipo: 'registro_individual'` y rechaza con un mensaje claro cualquier otro
-  payload — el avance agregado va a otro script y a otra planilla.
+  (`apps-script/Codigo.gs`, en este mismo repo). Antes era una copia sin versionar
+  del script de `Control_VeranoEnergy`, con la constante `SPREADSHEET_ID` cambiada
+  a mano; ahora cada app lleva el suyo y solo hay que editar esa constante. Este
+  script atiende únicamente `tipo: 'registro_individual'` y rechaza con un mensaje
+  claro cualquier otro payload.
+
+### Una planilla, dos apps
+
+El avance agregado (`Control_VeranoEnergy`) y este detalle por unidad escriben en
+la **misma planilla de Google Sheets**, cada uno con **su propio deployment** y su
+propia URL `/exec`. No se pisan porque usan hojas distintas:
+
+| App | Deployment | Hojas que escribe |
+|---|---|---|
+| Control_VeranoEnergy (avance) | el suyo | `Datos_Avance`, `Resumen_Proyecto`, `CONFIG_*`, `CATALOGOS` |
+| verano-energy-registros (detalle) | el suyo | `Registros_6.x`, `Indicios_6.1`, `Elementos_6.2`, `Individuos_6.3` |
+
+Cada script rechaza el payload del otro con un mensaje explicativo, así que una
+URL mal pegada en una app se nota de inmediato en vez de escribir datos en el
+lugar equivocado.
 
 ## Estructura
 
@@ -195,19 +209,18 @@ otra cuenta, se crea una carpeta base independiente.
 
 ### 1. Apps Script (planilla y deployment propios)
 
-1. Crea una planilla nueva en Google Sheets (distinta de la de avance) y copia su
-   ID: es lo que va entre `/d/` y `/edit` en su URL.
-2. Pega ese ID en la constante `SPREADSHEET_ID` de `apps-script/Codigo.gs` (línea
-   ~36 de este repo) — es el **único** valor que hay que tocar para apuntar a otra
-   planilla. Si queda el marcador `PEGA_AQUI_EL_ID_DE_LA_PLANILLA`, el script
-   responde con un error explícito en vez de escribir en cualquier parte.
-3. En esa planilla: **Extensiones → Apps Script**, borra todo y pega el archivo
+1. La planilla de destino ya está configurada en `apps-script/Codigo.gs`
+   (`SPREADSHEET_ID`) y es la misma que usa el avance agregado. Para apuntar a
+   otra, cambia **solo** esa constante: es lo que va entre `/d/` y `/edit` en la
+   URL de la planilla. Si queda el marcador `PEGA_AQUI_EL_ID_DE_LA_PLANILLA`, el
+   script responde con un error explícito en vez de escribir en cualquier parte.
+2. En esa planilla: **Extensiones → Apps Script**, borra todo y pega el archivo
    completo. Guarda (Cmd/Ctrl+S).
-4. **Implementar → Nueva implementación → Aplicación web**: ejecutar como "Yo",
+3. **Implementar → Nueva implementación → Aplicación web**: ejecutar como "Yo",
    acceso "Cualquier persona". Copia la URL `.../exec`.
-5. Pega esa URL en `js/sync.js` (`DEFAULT_URL`) o en la app, pestaña
+4. Pega esa URL en `js/sync.js` (`DEFAULT_URL`) o en la app, pestaña
    **Exportar → URL de sincronización**.
-6. Sincroniza un registro de prueba: las hojas `Registros_6.x` / `Indicios_6.1` /
+5. Sincroniza un registro de prueba: las hojas `Registros_6.x` / `Indicios_6.1` /
    `Elementos_6.2` / `Individuos_6.3` se crean solas en esta planilla.
 
 **Para cambiar de planilla después**, sin rehacer el deployment: edita
