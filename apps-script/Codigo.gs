@@ -157,12 +157,34 @@ function doPost(e) {
   }
 }
 
+// Diagnóstico: abrir esta URL en el navegador dice EN QUÉ PLANILLA está
+// escribiendo realmente este deployment. Sirve para despejar la duda más común
+// —"¿esta app quedó conectada a la planilla correcta?"— sin tener que leer el
+// código pegado en el editor de Apps Script, que es una copia separada del repo.
 function doGet() {
-  return _json({
+  const base = {
     status: 'ok',
     mensaje: 'Verano Energy – Registros de terreno – API activa',
     planilla_configurada: SPREADSHEET_ID !== 'PEGA_AQUI_EL_ID_DE_LA_PLANILLA',
-  });
+    hojas_destino: ['Registros_6.1', 'Indicios_6.1', 'Registros_6.2', 'Elementos_6.2',
+      'Registros_6.3', 'Individuos_6.3', 'KPI'],
+  };
+  if (!base.planilla_configurada) {
+    base.mensaje = 'Falta configurar SPREADSHEET_ID en el script.';
+    return _json(base);
+  }
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    base.planilla_nombre = ss.getName();
+    base.planilla_url = ss.getUrl();
+    base.hojas_existentes = ss.getSheets().map(function (h) { return h.getName(); });
+  } catch (err) {
+    // Típicamente: la cuenta que ejecuta el deployment no tiene acceso a esa
+    // planilla, o el ID quedó mal pegado.
+    base.status = 'error';
+    base.mensaje = 'No se pudo abrir la planilla: ' + (err && err.message ? err.message : err);
+  }
+  return _json(base);
 }
 
 // Upsert idempotente por record_id de un transecto/parcela/calicata y su detalle,
