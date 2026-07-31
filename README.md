@@ -205,6 +205,56 @@ ambos comparten la carpeta base "Verano Energy - Fotos" por nombre (pero cada
 uno sigue escribiendo en sus propias subcarpetas por EDT); si se desplegó bajo
 otra cuenta, se crea una carpeta base independiente.
 
+## Hoja KPI (seguimiento y control, uso interno)
+
+El script genera y mantiene una hoja **`KPI`** en la misma planilla. Son fórmulas
+vivas, no valores calculados: se recalculan solas al abrir o sincronizar la
+planilla, sin volver a correr nada. Es de uso interno por construcción — la ve
+quien tenga acceso a la planilla, y la PWA de terreno no la muestra.
+
+Un detalle importante: la PWA es offline-first y **cada celular guarda solo sus
+propios registros**, así que un panel dentro de la app reflejaría un único
+dispositivo. El consolidado del proyecto solo tiene sentido donde converge todo,
+que es la planilla.
+
+### Qué contiene
+
+- **Parámetros** (los completa el equipo a mano): valor unitario por EDT, monto
+  total del contrato y valor de la hora-hombre. Sin ellos, la sección de
+  valorización queda en cero pero el resto funciona igual.
+- **Avance vs meta** — registros y unidades levantadas contra las 177 de cada EDT,
+  % de avance, ponderación (33,33 / 33,33 / 33,34), aporte ponderado y fecha del
+  último registro.
+- **Valorización del servicio** — monto ejecutado por EDT y total, % del contrato,
+  saldo por ejecutar, y el monto según avance ponderado como contraste para
+  contratos que se pagan por hito en vez de por unidad.
+- **Productividad** — días efectivos en terreno, unidades por día, ritmo de los
+  últimos 7 días, unidades restantes y días estimados para terminar; más
+  horas-hombre, HH por unidad, costo en HH y margen estimado.
+- **Calidad del dato** — duplicados (registros menos unidades distintas), cuántas
+  faltan para la meta, % con foto y % con GPS por EDT.
+- **Hallazgos ecológicos** — indicios por transecto, especies registradas y
+  distintas, cobertura media, % de parcelas con curureras, % de calicatas con
+  geófita e individuos por calicata.
+- **Por persona evaluadora** — tabla `QUERY` que se expande sola; crece con el
+  equipo sin pisar las secciones de arriba.
+
+### Notas de diseño
+
+- El avance se mide con **unidades distintas** (`COUNTUNIQUE` del N° de unidad),
+  no con el número de filas: una unidad registrada dos veces por error cuenta una
+  sola vez contra la meta, y la diferencia aparece como "Duplicados".
+- Las referencias a columnas se calculan desde el esquema (`COLUMNAS_*`), no se
+  escriben a mano: si cambia el orden de las columnas, las fórmulas siguen
+  apuntando al campo correcto.
+- Las horas-hombre salen de `Datos_Avance`, que escribe la **otra** app. Van
+  envueltas en `IFERROR`, así que si esa hoja todavía no existe el KPI muestra 0
+  en vez de `#REF`.
+- Si falla la construcción del KPI, el registro **igual queda guardado**: el sync
+  no se da por fallido y el error se informa aparte, en `kpi_error`.
+- Para cambiar las fórmulas más adelante, sube `KPI_VERSION` en el script: la hoja
+  se regenera **conservando los parámetros** que el equipo haya escrito.
+
 ## Despliegue
 
 ### 1. Apps Script (planilla y deployment propios)
