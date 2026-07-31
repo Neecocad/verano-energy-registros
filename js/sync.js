@@ -28,18 +28,59 @@ function camposRegistro(edt) {
     'numero_unidad', 'utm_este', 'utm_norte', 'huso', 'foto', 'observaciones',
     'fecha_creacion', 'fecha_ultima_modificacion'];
   if (edt === '6.1') return [...comunes, 'codigo_gps_zona', 'presencia_vegetacion_acompanante', 'presencia_curureras'];
-  if (edt === '6.2') return [...comunes, 'codigo_gps_parcela', 'tipo_vegetacion', 'tipo_vegetacion_otro', 'especies', 'presencia_curureras'];
+  if (edt === '6.2') {
+    return [...comunes, 'parcela_id', 'codigo_parcela', 'codigo_gps_parcela', 'tipo_vegetacion',
+      'tipo_vegetacion_otro', 'presencia_curureras', 'ultimo_numero_especie', 'ultimo_numero_indicio'];
+  }
   return [...comunes, 'codigo_gps_calicata', 'presencia_geofita']; // 6.3
 }
 
 function filaRegistro(edt, reg) {
   const fila = {};
   camposRegistro(edt).forEach((c) => { fila[c] = reg[c] ?? null; });
+  // Registros de la versión anterior guardaban las especies como texto libre;
+  // se envía aparte para no perderlo (los nuevos lo dejan vacío).
+  if (edt === '6.2') fila.especies_texto_legado = typeof reg.especies === 'string' ? reg.especies : '';
   return fila;
 }
 
+// Columnas de la hoja Elementos_6.2 — mismas claves para especies e indicios,
+// vacías donde no aplican, para que cada elemento sea UNA fila homogénea.
+const COLUMNAS_ELEMENTO = ['elemento_id', 'codigo_parcela', 'tipo_fila', 'numero_elemento', 'codigo_elemento',
+  'nombre_especie', 'cobertura_porcentaje', 'observaciones_especie',
+  'tipo_indicio', 'tipo_indicio_otro', 'utm_este', 'utm_norte', 'huso', 'codigo_gps_indicio',
+  'observaciones_indicio', 'foto'];
+
+function filaElemento(reg, el) {
+  const fila = {};
+  COLUMNAS_ELEMENTO.forEach((c) => { fila[c] = el[c] ?? ''; });
+  fila.codigo_parcela = el.codigo_parcela || reg.codigo_parcela || '';
+  // Indicios guardados antes del cambio usaban `observaciones` a secas.
+  if (!fila.observaciones_indicio && el.observaciones) fila.observaciones_indicio = el.observaciones;
+  fila.foto = el.foto || null;
+  return fila;
+}
+
+// Una fila por elemento, sin combinar tipos ni cruzarlos: 3 especies + 2
+// indicios = 5 filas.
+function detalleParcela(reg) {
+  const especies = Array.isArray(reg.especies) ? reg.especies : [];
+  const indicios = reg.indicios || [];
+  return [...especies, ...indicios].map((el) => filaElemento(reg, el));
+}
+
 function filaDetalle(edt, reg) {
-  return edt === '6.3' ? (reg.individuos || []) : (reg.indicios || []);
+  if (edt === '6.3') return reg.individuos || [];
+  if (edt === '6.2') return detalleParcela(reg);
+  return reg.indicios || [];
+}
+
+// Hoja de destino del detalle. En 6.2 el detalle dejó de ser solo indicios: son
+// "elementos" (especies + indicios) y van a su propia hoja.
+function hojaDetalle(edt) {
+  if (edt === '6.1') return 'Indicios_6.1';
+  if (edt === '6.2') return 'Elementos_6.2';
+  return 'Individuos_6.3';
 }
 
 async function enviarUno(url, edt, reg) {
@@ -47,6 +88,7 @@ async function enviarUno(url, edt, reg) {
     tipo: 'registro_individual',
     codigo_edt: edt,
     record_id: reg.record_id,
+    hoja_detalle: hojaDetalle(edt),
     registro: filaRegistro(edt, reg),
     detalle: filaDetalle(edt, reg),
   };

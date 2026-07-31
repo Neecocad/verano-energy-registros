@@ -28,7 +28,7 @@ function ordenar(regs) {
 
 // ---------- 6.1 · Zona y Transecto ----------
 function hojaRegistros61(regs) {
-  const head = ['Zona', 'Fecha', 'Evaluadora', 'N° Transecto', 'UTM Este', 'UTM Norte', 'Huso',
+  const head = ['Zona', 'Fecha', 'Persona evaluadora', 'N° Transecto', 'UTM Este', 'UTM Norte', 'Huso',
     'Código GPS zona', 'Vegetación acompañante', 'Curureras', 'Foto', 'N° indicios',
     'Observaciones', 'Estado sincronización', 'Fecha creación', 'record_id'];
   const rows = [head];
@@ -55,23 +55,69 @@ function hojaIndicios(regs, tituloUnidad) {
 }
 
 // ---------- 6.2 · Parcela ----------
+// Registros anteriores a los "elementos encontrados" guardaban las especies como
+// un texto libre en `especies`. Se conserva en su propia columna para no perder
+// nada; los registros nuevos traen `especies` como lista de elementos.
+function especiesLista(r) {
+  return Array.isArray(r.especies) ? r.especies : [];
+}
+
+function especiesTextoLegado(r) {
+  return typeof r.especies === 'string' ? r.especies : '';
+}
+
 function hojaRegistros62(regs) {
-  const head = ['Zona', 'Fecha', 'Evaluadora', 'N° Parcela', 'UTM Este', 'UTM Norte', 'Huso',
-    'Código GPS parcela', 'Tipo de vegetación', 'Otro (especificar)', 'Especies (con % cobertura)',
-    'Curureras', 'Foto', 'N° indicios', 'Observaciones', 'Estado sincronización', 'Fecha creación', 'record_id'];
+  const head = ['Código parcela', 'Zona', 'Fecha', 'Persona evaluadora', 'N° Parcela', 'UTM Este', 'UTM Norte', 'Huso',
+    'Código GPS parcela', 'Tipo de vegetación', 'Otro (especificar)', 'Curureras', 'Foto',
+    'N° especies', 'N° indicios', 'Último N° especie', 'Último N° indicio',
+    'Especies (texto, versión anterior)', 'Observaciones', 'Estado sincronización', 'Fecha creación',
+    'parcela_id', 'record_id'];
   const rows = [head];
   for (const r of ordenar(regs)) {
-    rows.push([r.zona, r.fecha, r.evaluadora, r.numero_unidad, r.utm_este ?? '', r.utm_norte ?? '', r.huso ?? '',
-      r.codigo_gps_parcela || '', r.tipo_vegetacion || '', r.tipo_vegetacion_otro || '', r.especies || '',
-      r.presencia_curureras || '', r.foto ? 'Sí' : 'No', (r.indicios || []).length, r.observaciones || '',
-      r.estado_sincronizacion || 'Pendiente', fechaCorta(r.fecha_creacion), r.record_id]);
+    rows.push([r.codigo_parcela || '', r.zona, r.fecha, r.evaluadora, r.numero_unidad,
+      r.utm_este ?? '', r.utm_norte ?? '', r.huso ?? '',
+      r.codigo_gps_parcela || '', r.tipo_vegetacion || '', r.tipo_vegetacion_otro || '',
+      r.presencia_curureras || '', r.foto ? 'Sí' : 'No',
+      especiesLista(r).length, (r.indicios || []).length,
+      r.ultimo_numero_especie ?? '', r.ultimo_numero_indicio ?? '',
+      especiesTextoLegado(r), r.observaciones || '',
+      r.estado_sincronizacion || 'Pendiente', fechaCorta(r.fecha_creacion),
+      r.parcela_id || '', r.record_id]);
+  }
+  return rows;
+}
+
+// Una fila por elemento: las columnas propias de especie quedan vacías en las
+// filas INDICIO y viceversa. Nunca se combinan ni se cruzan entre sí — tres
+// especies y dos indicios producen exactamente cinco filas.
+function hojaElementos62(regs) {
+  const head = ['Código parcela', 'N° Parcela', 'Zona', 'Fecha', 'tipo_fila', 'Código elemento', 'N° elemento',
+    'Nombre especie', '% cobertura', 'Observaciones especie',
+    'Tipo indicio', 'Indicio: otro (especificar)', 'UTM Este', 'UTM Norte', 'Huso', 'Código GPS indicio',
+    'Observaciones indicio', 'Foto', 'elemento_id', 'record_id (padre)'];
+  const rows = [head];
+  for (const r of ordenar(regs)) {
+    const codParcela = r.codigo_parcela || '';
+    for (const e of especiesLista(r)) {
+      rows.push([codParcela, r.numero_unidad, r.zona, r.fecha, 'ESPECIE', e.codigo_elemento || '', e.numero_elemento ?? '',
+        e.nombre_especie || '', e.cobertura_porcentaje ?? '', e.observaciones_especie || '',
+        '', '', '', '', '', '', '',
+        e.foto ? 'Sí' : 'No', e.elemento_id || '', r.record_id]);
+    }
+    for (const i of r.indicios || []) {
+      rows.push([codParcela, r.numero_unidad, r.zona, r.fecha, 'INDICIO', i.codigo_elemento || '', i.numero_elemento ?? '',
+        '', '', '',
+        i.tipo_indicio || '', i.tipo_indicio_otro || '', i.utm_este ?? '', i.utm_norte ?? '', i.huso ?? '',
+        i.codigo_gps_indicio || '', i.observaciones_indicio ?? i.observaciones ?? '',
+        i.foto ? 'Sí' : 'No', i.elemento_id || '', r.record_id]);
+    }
   }
   return rows;
 }
 
 // ---------- 6.3 · Calicatas ----------
 function hojaRegistros63(regs) {
-  const head = ['Zona', 'Fecha', 'Evaluadora', 'N° Calicata', 'UTM Este', 'UTM Norte', 'Huso',
+  const head = ['Zona', 'Fecha', 'Persona evaluadora', 'N° Calicata', 'UTM Este', 'UTM Norte', 'Huso',
     'Código GPS calicata', 'Presencia de geófita', 'Foto', 'N° individuos', 'Observaciones',
     'Estado sincronización', 'Fecha creación', 'record_id'];
   const rows = [head];
@@ -102,7 +148,7 @@ export async function exportarExcel(todos) {
     { name: 'Registros 6.1', rows: hojaRegistros61(todos['6.1']) },
     { name: 'Indicios 6.1', rows: hojaIndicios(todos['6.1'], 'N° Transecto') },
     { name: 'Registros 6.2', rows: hojaRegistros62(todos['6.2']) },
-    { name: 'Indicios 6.2', rows: hojaIndicios(todos['6.2'], 'N° Parcela') },
+    { name: 'Elementos 6.2', rows: hojaElementos62(todos['6.2']) },
     { name: 'Registros 6.3', rows: hojaRegistros63(todos['6.3']) },
     { name: 'Individuos 6.3', rows: hojaIndividuos(todos['6.3']) },
   ]);

@@ -1,5 +1,5 @@
 // Service Worker — cachea la app para uso 100% offline.
-const CACHE = 'verano-energy-registros-v1';
+const CACHE = 'verano-energy-registros-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './js/db.js',
   './js/utm.js',
   './js/catalog.js',
+  './js/codigos.js',
   './js/export.js',
   './js/sync.js',
   './js/xlsx-mini.js',

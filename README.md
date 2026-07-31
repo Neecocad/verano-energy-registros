@@ -18,11 +18,29 @@ detalle por unidad; ver "Próximos pasos" en el README de `Control_VeranoEnergy`
 | EDT | Formulario | Unidad | Punto GPS + foto principal | Lista repetible (GPS + foto propios) |
 |---|---|---|---|---|
 | 6.1 | Zona y Transecto | Transecto (1–177) | Punto centro del transecto | Indicios encontrados (0..N) |
-| 6.2 | Parcela | Parcela (1–177) | Punto centro de la parcela | Indicios encontrados (0..N) |
+| 6.2 | Parcela | Parcela (1–177) | Punto centro de la parcela | **Elementos encontrados**: especies e indicios (0..N de cada tipo) |
 | 6.3 | Calicatas | Calicata (1–177) | Punto de la calicata | Individuos de geófita encontrados (0..N) |
 
 Cada indicio (6.1/6.2) o individuo (6.3) puede tener su propio punto GPS y su
 propia fotografía, independientes del punto/foto principal del registro.
+
+### Geo-sello de las fotografías
+
+Toda foto de los 3 formularios —principal, de indicio, de especie y de
+individuo— se estampa por Canvas antes de guardarse, de modo que el sello viaja
+con el archivo a Drive y no depende de metadatos EXIF. El sello incluye siempre
+**nombre del proyecto** y **coordenadas UTM**, más EDT y unidad (con el código de
+parcela en 6.2), zona, el elemento al que pertenece, la persona evaluadora y la
+fecha/hora local. Cuando el bloque no tiene punto propio (especies, individuos de
+calicata) se usa el punto principal de la unidad y el sello lo declara como tal,
+p. ej. `UTM 19S: 346813 E · 6296844 N (punto de parcela)`.
+
+### Persona evaluadora
+
+El desplegable lista el catálogo de `js/catalog.js` (Juan Araya al final) y cierra
+con **"Otro (especificar)"**, que habilita un campo de texto para iniciales o un
+nombre escrito. El valor efectivo —el del catálogo o el texto libre— es el que se
+guarda en `evaluadora` y el que llega a la planilla y al geo-sello.
 
 ## Arquitectura (misma base que Control_VeranoEnergy)
 
@@ -46,9 +64,10 @@ propia fotografía, independientes del punto/foto principal del registro.
 
 ```
 index.html              · interfaz (3 formularios + Exportar), cada uno con sub-tabs Nuevo/Registros
-css/styles.css          · estilos (incluye bloques repetibles de indicios/individuos)
+css/styles.css          · estilos (incluye bloques repetibles de indicios/individuos/elementos)
 js/app.js               · formularios, GPS, foto con geo-sello, listas, navegación
 js/catalog.js           · proyecto, responsables, catálogos de dropdowns
+js/codigos.js           · UUID y códigos visibles estables (parcela y elementos)
 js/db.js                · IndexedDB — 3 stores (uno por EDT)
 js/utm.js               · conversión lat/lon → UTM (idéntico a Control_VeranoEnergy)
 js/export.js            · exportación Excel multi-hoja (Registros + Indicios/Individuos)
@@ -65,11 +84,46 @@ Cada registro principal (`registros_61`/`registros_62`/`registros_63`) guarda:
 `record_id, proyecto_id, nombre_proyecto, zona, fecha, evaluadora, numero_unidad,
 utm_este, utm_norte, huso, foto, observaciones` + campos propios del EDT
 (`presencia_vegetacion_acompanante`/`presencia_curureras` en 6.1;
-`tipo_vegetacion`/`especies`/`presencia_curureras` en 6.2; `presencia_geofita` en
-6.3) + una lista embebida `indicios[]` (6.1/6.2) o `individuos[]` (6.3), cada
-elemento con sus propios `utm_este, utm_norte, huso, foto, observaciones`
-(indicios) o `profundidad_cm, estado_fenologico, estado_sanitario, foto`
-(individuos).
+`tipo_vegetacion`/`presencia_curureras` en 6.2; `presencia_geofita` en
+6.3) + una lista embebida `indicios[]` (6.1), `especies[]` + `indicios[]` (6.2) o
+`individuos[]` (6.3), cada elemento con sus propios `utm_este, utm_norte, huso,
+foto, observaciones` (indicios) o `profundidad_cm, estado_fenologico,
+estado_sanitario, foto` (individuos).
+
+### EDT 6.2 · Códigos estables de parcela y elementos
+
+La parcela conserva dos identificadores que **no son lo mismo** y se guardan
+ambos: `parcela_id` (UUID técnico inmutable) y `codigo_parcela` (código visible
+`Z{zona 2 díg}-P{parcela 3 díg}`, p. ej. `Z01-P001`, `Z02-P015`, `Z12-P177`). El
+código se genera localmente en la PWA, sin internet, en cuanto existen zona y N°
+de parcela, y queda congelado al crearse el primer elemento.
+
+Cada elemento de "Elementos encontrados" lleva `elemento_id` (UUID),
+`tipo_fila` (`ESPECIE` o `INDICIO`, asignado por la app según el botón que se
+presionó — no hay ningún campo `tipo_fila` editable), `numero_elemento` y
+`codigo_elemento` (`{codigo_parcela}-E{2 díg}` para especies,
+`{codigo_parcela}-I{2 díg}` para indicios).
+
+Los correlativos de especies e indicios se administran por separado, en
+`ultimo_numero_especie` y `ultimo_numero_indicio`, y **solo suben**: el código se
+asigna una vez al crear el elemento y no se recalcula por posición visual, ni al
+reordenar, ni al editar el registro. Los correlativos eliminados no se reutilizan
+—de `E01, E02, E03` se borra `E02` y la siguiente especie es `E04`, sin renumerar
+`E03`— y por eso no existe (ni debe agregarse) ninguna función de renumeración.
+
+```js
+{
+  parcela_id: "UUID", codigo_parcela: "Z01-P001",
+  ultimo_numero_especie: 3, ultimo_numero_indicio: 2,
+  especies: [{ elemento_id: "UUID", tipo_fila: "ESPECIE", numero_elemento: 1,
+               codigo_elemento: "Z01-P001-E01", nombre_especie: "Espino",
+               cobertura_porcentaje: 30, observaciones_especie: "", foto: null }],
+  indicios: [{ elemento_id: "UUID", tipo_fila: "INDICIO", numero_elemento: 1,
+               codigo_elemento: "Z01-P001-I01", tipo_indicio: "Cururera",
+               tipo_indicio_otro: "", observaciones_indicio: "",
+               utm_este: null, utm_norte: null, huso: null, foto: null }],
+}
+```
 
 ## Google Sheets generado (extensión de Codigo.gs)
 
@@ -77,8 +131,33 @@ Al sincronizar, el Apps Script crea (si no existen) y hace upsert idempotente po
 `record_id` en:
 
 - **Registros_6.1** / **Indicios_6.1**
-- **Registros_6.2** / **Indicios_6.2**
+- **Registros_6.2** / **Elementos_6.2**
 - **Registros_6.3** / **Individuos_6.3**
+
+### ⚠️ Elementos_6.2 requiere actualizar el Apps Script
+
+El detalle de 6.2 dejó de ser solo indicios: ahora son **elementos** (especies +
+indicios) y van a la hoja **Elementos_6.2**, no a `Indicios_6.2`. El payload de
+sincronización incluye `hoja_detalle` con el nombre de la hoja de destino, así que
+`Codigo.gs` debe leer ese campo (o mapear `6.2 → Elementos_6.2`) en vez de asumir
+`Indicios_6.x`. Mientras no se actualice, los registros 6.2 nuevos seguirán
+escribiéndose en la hoja antigua con columnas que no calzan.
+
+Cada especie y cada indicio produce **una fila independiente**; las columnas
+propias de un tipo quedan vacías en las filas del otro, y no se combinan ni se
+cruzan entre sí (3 especies + 2 indicios = exactamente 5 filas). Columnas de
+`Elementos_6.2`:
+
+`elemento_id, codigo_parcela, tipo_fila, numero_elemento, codigo_elemento,
+nombre_especie, cobertura_porcentaje, observaciones_especie, tipo_indicio,
+tipo_indicio_otro, utm_este, utm_norte, huso, codigo_gps_indicio,
+observaciones_indicio, foto`
+
+| codigo_parcela | tipo_fila | codigo_elemento | nombre_especie | cobertura_porcentaje | tipo_indicio |
+|---|---|---|---|---|---|
+| Z01-P001 | ESPECIE | Z01-P001-E01 | Espino | 30 | |
+| Z01-P001 | ESPECIE | Z01-P001-E02 | Huingán | 15 | |
+| Z01-P001 | INDICIO | Z01-P001-I01 | | | Cururera |
 
 Las fotos (principal y de cada indicio/individuo) se suben a Drive, dentro de una
 carpeta base "Verano Energy - Fotos" (se crea sola si no existe) en el Drive de
@@ -134,7 +213,9 @@ del mismo script, no un código compartido).
 3. **Resincronización**: sincroniza, corta la conexión a mitad de un lote y
    verifica que al reintentar no se dupliquen filas (upsert por `record_id`).
 4. **Exportar**: descarga el Excel y confirma que las 6 hojas (Registros +
-   Indicios/Individuos por EDT) tienen los datos esperados.
+   Indicios/Elementos/Individuos por EDT) tienen los datos esperados.
+5. **Códigos de 6.2**: agrega 3 especies, elimina la segunda, agrega otra y
+   verifica que la nueva sea `E04` (no `E02`) y que la tercera siga siendo `E03`.
 
 ## Próximos pasos
 

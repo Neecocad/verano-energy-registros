@@ -45,10 +45,13 @@
               <label>Fecha
                 <input type="date" data-f="fecha" required />
               </label>
-              <label>Evaluadora
+              <label>Persona evaluadora
                 <select data-f="evaluadora" required></select>
               </label>
             </div>
+            <label class="hidden" data-otro-evaluadora-wrap>Iniciales o nombre de la persona evaluadora
+              <input type="text" data-f="evaluadora_otro" placeholder="Ej: M.J.P. o Marcela Pérez" />
+            </label>
             <label>N° de transecto (1–177)
               <input type="number" data-f="numero_unidad" min="1" max="177" step="1" inputmode="numeric" required />
             </label>
@@ -141,20 +144,27 @@
         <form class="reg-form" data-edt="6.2" autocomplete="off">
           <fieldset>
             <legend>Parcela</legend>
-            <label>Código de zona
-              <input type="text" data-f="zona" required />
+            <label>Zona (N°)
+              <input type="number" data-f="zona" min="1" max="99" step="1" inputmode="numeric" required />
             </label>
             <div class="grid-2">
               <label>Fecha
                 <input type="date" data-f="fecha" required />
               </label>
-              <label>Evaluadora
+              <label>Persona evaluadora
                 <select data-f="evaluadora" required></select>
               </label>
             </div>
+            <label class="hidden" data-otro-evaluadora-wrap>Iniciales o nombre de la persona evaluadora
+              <input type="text" data-f="evaluadora_otro" placeholder="Ej: M.J.P. o Marcela Pérez" />
+            </label>
             <label>N° de parcela (1–177)
               <input type="number" data-f="numero_unidad" min="1" max="177" step="1" inputmode="numeric" required />
             </label>
+            <label>Código de la parcela (automático)
+              <input type="text" data-codigo-parcela readonly placeholder="Z01-P001" />
+            </label>
+            <p class="hint hidden warn" data-codigo-parcela-warn></p>
           </fieldset>
 
           <fieldset>
@@ -184,9 +194,7 @@
             <label class="hidden" data-otro-vegetacion-wrap>Especificar "Otro"
               <input type="text" data-f="tipo_vegetacion_otro" />
             </label>
-            <label>Especies observadas (con % de cobertura de cada una)
-              <textarea data-f="especies" rows="2" placeholder="Ej: Coirón 40%, Neneo 30%, Suelo desnudo 30%"></textarea>
-            </label>
+            <p class="hint">Las especies observadas se registran una por una más abajo, en <strong>Elementos encontrados</strong>.</p>
             <label>¿Presencia de curureras?
               <select data-f="presencia_curureras" required>
                 <option value="">— Seleccionar —</option>
@@ -209,10 +217,18 @@
           </fieldset>
 
           <fieldset>
-            <legend>Indicios encontrados</legend>
-            <p class="hint">Si hay uno o más indicios, agrégalos aquí con su propio punto GPS y foto.</p>
-            <div class="indicios-list" data-indicios></div>
-            <button type="button" class="btn-ghost" data-add-indicio>➕ Agregar indicio</button>
+            <legend>Elementos encontrados</legend>
+            <p class="hint">
+              Cada especie y cada indicio es un elemento independiente, con su propio código
+              estable. Ingresa primero la zona y el N° de parcela: el código se asigna al crear
+              el elemento y ya no cambia (si eliminas uno, su correlativo no se reutiliza).
+            </p>
+            <div class="elementos-list" data-elementos></div>
+            <div class="add-row">
+              <button type="button" class="btn-ghost" data-add-especie>➕ Agregar especie</button>
+              <button type="button" class="btn-ghost" data-add-indicio-parcela>➕ Agregar indicio</button>
+            </div>
+            <p class="hint" data-elementos-resumen>Sin elementos registrados.</p>
           </fieldset>
 
           <fieldset>
@@ -251,10 +267,13 @@
               <label>Fecha
                 <input type="date" data-f="fecha" required />
               </label>
-              <label>Evaluadora
+              <label>Persona evaluadora
                 <select data-f="evaluadora" required></select>
               </label>
             </div>
+            <label class="hidden" data-otro-evaluadora-wrap>Iniciales o nombre de la persona evaluadora
+              <input type="text" data-f="evaluadora_otro" placeholder="Ej: M.J.P. o Marcela Pérez" />
+            </label>
             <label>N° de calicata (1–177)
               <input type="number" data-f="numero_unidad" min="1" max="177" step="1" inputmode="numeric" required />
             </label>
@@ -348,6 +367,67 @@
         <strong data-indicio-title>Indicio</strong>
         <button type="button" class="btn-mini danger" data-remove>🗑</button>
       </div>
+      <div class="row gps-row">
+        <button type="button" class="btn-gps" data-gps>📍 Capturar GPS</button>
+        <span class="hint" data-gps-acc></span>
+      </div>
+      <label>Código GPS indicio (opcional)
+        <input type="text" data-codigo-gps />
+      </label>
+      <div class="foto-row">
+        <button type="button" class="btn-foto" data-foto>📷 Tomar foto</button>
+        <input type="file" data-foto-input accept="image/*" capture="environment" class="hidden" />
+      </div>
+      <div class="foto-preview hidden" data-foto-preview>
+        <img data-foto-img />
+        <button type="button" class="btn-mini danger" data-foto-del>Quitar foto</button>
+      </div>
+      <label>Observaciones del indicio
+        <textarea data-observaciones rows="2"></textarea>
+      </label>
+    </div>
+  </template>
+
+  <!-- 6.2 · Elemento de tipo ESPECIE. `tipo_fila` lo asigna la app, nunca la persona usuaria. -->
+  <template id="tpl-especie">
+    <div class="sub-item especie" data-elemento-item data-tipo-fila="ESPECIE">
+      <div class="sub-item-head">
+        <strong data-elemento-title>Especie</strong>
+        <button type="button" class="btn-mini danger" data-remove>🗑</button>
+      </div>
+      <label>Nombre de la especie
+        <input type="text" data-nombre-especie placeholder="Ej: Espino" />
+      </label>
+      <label>Cobertura (%)
+        <input type="number" data-cobertura min="0" max="100" step="1" inputmode="numeric" />
+      </label>
+      <div class="foto-row">
+        <button type="button" class="btn-foto" data-foto>📷 Tomar foto</button>
+        <input type="file" data-foto-input accept="image/*" capture="environment" class="hidden" />
+      </div>
+      <div class="foto-preview hidden" data-foto-preview>
+        <img data-foto-img />
+        <button type="button" class="btn-mini danger" data-foto-del>Quitar foto</button>
+      </div>
+      <label>Observaciones de la especie
+        <textarea data-observaciones rows="2"></textarea>
+      </label>
+    </div>
+  </template>
+
+  <!-- 6.2 · Elemento de tipo INDICIO, con su propio punto GPS y foto. -->
+  <template id="tpl-indicio-parcela">
+    <div class="sub-item indicio" data-elemento-item data-tipo-fila="INDICIO">
+      <div class="sub-item-head">
+        <strong data-elemento-title>Indicio</strong>
+        <button type="button" class="btn-mini danger" data-remove>🗑</button>
+      </div>
+      <label>Tipo de indicio
+        <select data-tipo-indicio></select>
+      </label>
+      <label class="hidden" data-tipo-indicio-otro-wrap>Especificar "Otro"
+        <input type="text" data-tipo-indicio-otro />
+      </label>
       <div class="row gps-row">
         <button type="button" class="btn-gps" data-gps>📍 Capturar GPS</button>
         <span class="hint" data-gps-acc></span>
