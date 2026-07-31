@@ -115,3 +115,5 @@ input[data-codigo-parcela] { font-family: ui-monospace, "SF Mono", Menlo, monosp
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+.btn-link { background: none; border: none; color: var(--blue); text-decoration: underline; font-size: .8rem; cursor: pointer; padding: 0; width: auto; font-family: inherit; }

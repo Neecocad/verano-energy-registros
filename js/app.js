@@ -15,7 +15,7 @@ import {
   TIPO_FILA_ESPECIE, TIPO_FILA_INDICIO,
 } from './codigos.js';
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const EDTS = ['6.1', '6.2', '6.3'];
 
 const $ = (id) => document.getElementById(id);
@@ -780,6 +780,10 @@ async function init() {
 
   $('sync-url').value = SYNC.getUrl();
   $('sync-url').addEventListener('change', (e) => { SYNC.setUrl(e.target.value); toast('URL guardada'); });
+  $('sync-url-reset').addEventListener('click', () => {
+    $('sync-url').value = SYNC.resetUrl();
+    toast('URL restablecida a la de la app');
+  });
   $('btn-sync').addEventListener('click', async () => {
     const btn = $('btn-sync');
     btn.disabled = true;

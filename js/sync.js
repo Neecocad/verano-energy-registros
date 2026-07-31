@@ -7,12 +7,28 @@
 // hace upsert idempotente por record_id.
 import * as DB from './db.js';
 
-const URL_KEY = 'verano-energy-registros-sync-url';
+// La URL que el equipo haya escrito a mano en "Exportar → URL de sincronización"
+// queda guardada en el navegador del celular y tiene prioridad sobre DEFAULT_URL.
+// Eso es útil para pruebas, pero se vuelve una trampa cuando el deployment
+// cambia: ese celular seguiría enviando al Web App antiguo aunque la app se
+// actualice, y nadie lo notaría porque el sync responde "ok".
+//
+// Por eso la clave lleva sufijo de versión: al cambiar de deployment se sube el
+// sufijo, lo guardado bajo la clave anterior deja de leerse y DEFAULT_URL vuelve
+// a mandar en todos los equipos, sin que nadie tenga que tocar su teléfono.
+const URL_KEY = 'verano-energy-registros-sync-url-v2';
+const URL_KEYS_ANTIGUAS = ['verano-energy-registros-sync-url'];
 
-// URL del Web App de Apps Script desplegado sobre la planilla de "Registros de
-// terreno" (distinta de la planilla de avance agregado). Ese script es una copia
-// de apps-script/Codigo.gs con su propio SPREADSHEET_ID.
-const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbwZXGXuhwVcwpUVdZgZBCNxFml6qe2TnRfswGROmSTyK-Ts8SBFhH_gzIQm3lt5M9nPBA/exec';
+// URL del Web App de Apps Script desplegado sobre la planilla "Verano Energy"
+// (apps-script/Codigo.gs de este repo). Es la misma planilla donde sincroniza el
+// avance agregado, pero otro deployment y otras hojas.
+const DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbx_kfvI8WLONHog_k35tUvoz_BkVJlhbxB8d4iGWhuIPm0ODku8W2sceKxRAEW0x5x5Vg/exec';
+
+// Se limpian las claves viejas para que no queden URLs muertas dando vueltas en
+// el almacenamiento del navegador.
+try {
+  URL_KEYS_ANTIGUAS.forEach((k) => localStorage.removeItem(k));
+} catch (_) { /* almacenamiento bloqueado: no es crítico */ }
 
 export function getUrl() {
   return localStorage.getItem(URL_KEY) || DEFAULT_URL;
@@ -20,6 +36,12 @@ export function getUrl() {
 
 export function setUrl(url) {
   localStorage.setItem(URL_KEY, url.trim());
+}
+
+// Permite volver al valor que trae la app, si alguien pegó una URL equivocada.
+export function resetUrl() {
+  localStorage.removeItem(URL_KEY);
+  return DEFAULT_URL;
 }
 
 // Campos del registro principal según el EDT (sin id/sincronizado ni la sub-lista).

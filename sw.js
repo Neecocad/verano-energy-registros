@@ -1,5 +1,5 @@
 // Service Worker — cachea la app para uso 100% offline.
-const CACHE = 'verano-energy-registros-v2';
+const CACHE = 'verano-energy-registros-v3';
 const ASSETS = [
   './',
   './index.html',
