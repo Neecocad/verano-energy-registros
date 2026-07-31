@@ -51,18 +51,19 @@ guarda en `evaluadora` y el que llega a la planilla y al geo-sello.
   avance agregado) — captura `navigator.geolocation`, conversión a UTM
   (`js/utm.js`), y estampado de texto (proyecto, EDT, evaluadora, fecha, UTM) sobre
   la foto vía Canvas antes de guardarla.
-- **Sincronización manual** contra un Web App de Apps Script **propio**, desplegado
-  sobre su **propia planilla** de Google Sheets (independiente de la que usa
-  Control_VeranoEnergy). Ese script es una copia de `apps-script/Codigo.gs` (del
-  repo `Control_VeranoEnergy`) con la constante `SPREADSHEET_ID` apuntando a esta
-  planilla nueva en vez de la de avance. El payload incluye
-  `tipo: 'registro_individual'` para que el script lo enrute a las hojas
-  correctas; la rama `tipo: 'avance'` del script queda presente pero sin uso en
-  este deployment.
+- **Sincronización manual** contra un Web App de Apps Script **propio**
+  (`apps-script/Codigo.gs`, en este mismo repo), desplegado sobre su **propia
+  planilla** de Google Sheets, independiente de la que usa Control_VeranoEnergy.
+  Antes era una copia sin versionar del script de aquel repo, con la constante
+  `SPREADSHEET_ID` cambiada a mano; ahora cada app lleva el suyo y solo hay que
+  editar esa constante. Este script atiende únicamente
+  `tipo: 'registro_individual'` y rechaza con un mensaje claro cualquier otro
+  payload — el avance agregado va a otro script y a otra planilla.
 
 ## Estructura
 
 ```
+apps-script/Codigo.gs   · Web App de esta app: Sheets multi-hoja + fotos a Drive
 index.html              · interfaz (3 formularios + Exportar), cada uno con sub-tabs Nuevo/Registros
 css/styles.css          · estilos (incluye bloques repetibles de indicios/individuos/elementos)
 js/app.js               · formularios, GPS, foto con geo-sello, listas, navegación
@@ -146,16 +147,16 @@ El detalle de 6.2 dejó de ser solo indicios: ahora son **elementos** (especies 
 indicios) y van a la hoja **Elementos_6.2**, no a `Indicios_6.2` (que se conserva
 intacta con los datos históricos, porque tenía otro esquema de columnas).
 
-`apps-script/Codigo.gs` del repo `Control_VeranoEnergy` ya está actualizado para
-esto, pero recuerda que el deployment que usa esta PWA es una **copia** con su
-propio `SPREADSHEET_ID`: hay que **pegar de nuevo el script y volver a implementar**
-esa copia para que los cambios tomen efecto (ver "Despliegue" más abajo).
+`apps-script/Codigo.gs` (este repo) ya viene con todo esto. Para que tome efecto
+hay que pegarlo en el editor de Apps Script de la planilla y volver a implementar
+(ver "Despliegue").
 
-La actualización de esa copia incluye una migración automática: el script lee el
-encabezado real de cada hoja y agrega al final las columnas que falten, sin mover
-ni reordenar las que ya tienen datos. Las filas históricas de `Registros_6.2` se
-mantienen tal cual y solo ganan cuatro columnas nuevas (`parcela_id`,
-`codigo_parcela`, `ultimo_numero_especie`, `ultimo_numero_indicio`).
+El script no necesita una planilla en blanco: lee el encabezado real de cada hoja
+y agrega al final solo las columnas que falten, sin mover ni reordenar las que ya
+tienen datos. Si la planilla venía de la versión anterior, las filas históricas de
+`Registros_6.2` quedan tal cual y solo ganan cuatro columnas nuevas (`parcela_id`,
+`codigo_parcela`, `ultimo_numero_especie`, `ultimo_numero_indicio`). Si la planilla
+es nueva, crea todas las hojas con su encabezado completo en el primer sync.
 
 Las fotos del detalle pasaron a nombrarse por el código o el número estable del
 ítem (`{record_id}_Z01-P001-E01.jpg`) en vez de por su posición en la lista, para
@@ -195,27 +196,31 @@ otra cuenta, se crea una carpeta base independiente.
 ### 1. Apps Script (planilla y deployment propios)
 
 1. Crea una planilla nueva en Google Sheets (distinta de la de avance) y copia su
-   ID (entre `/d/` y `/edit` en la URL).
-2. En esa planilla: **Extensiones → Apps Script**, pega el contenido de
-   `apps-script/Codigo.gs` (del repo `Control_VeranoEnergy`).
-3. Reemplaza la constante `SPREADSHEET_ID` (cerca del inicio del archivo) por el
-   ID de **esta** planilla nueva — es crítico: si se deja el ID de la planilla de
-   avance, los datos se seguirían escribiendo ahí por error.
-4. Guarda (Cmd/Ctrl+S) y **Implementar → Nueva implementación → Aplicación web**:
-   ejecutar como "Yo", acceso "Cualquier persona". Copia la URL `.../exec`.
+   ID: es lo que va entre `/d/` y `/edit` en su URL.
+2. Pega ese ID en la constante `SPREADSHEET_ID` de `apps-script/Codigo.gs` (línea
+   ~36 de este repo) — es el **único** valor que hay que tocar para apuntar a otra
+   planilla. Si queda el marcador `PEGA_AQUI_EL_ID_DE_LA_PLANILLA`, el script
+   responde con un error explícito en vez de escribir en cualquier parte.
+3. En esa planilla: **Extensiones → Apps Script**, borra todo y pega el archivo
+   completo. Guarda (Cmd/Ctrl+S).
+4. **Implementar → Nueva implementación → Aplicación web**: ejecutar como "Yo",
+   acceso "Cualquier persona". Copia la URL `.../exec`.
 5. Pega esa URL en `js/sync.js` (`DEFAULT_URL`) o en la app, pestaña
    **Exportar → URL de sincronización**.
-6. Sincroniza un registro de prueba: las hojas `Registros_6.x` /
-   `Indicios_6.1`/`6.2` / `Individuos_6.3` se crean solas en esta planilla nueva.
+6. Sincroniza un registro de prueba: las hojas `Registros_6.x` / `Indicios_6.1` /
+   `Elementos_6.2` / `Individuos_6.3` se crean solas en esta planilla.
 
-Si más adelante se actualiza `Codigo.gs` en el repo `Control_VeranoEnergy`, hay
-que replicar el cambio manualmente aquí también (son dos copias independientes
-del mismo script, no un código compartido). Para replicarlo: abre la planilla de
-registros → **Extensiones → Apps Script**, pega el archivo completo, guarda, y
-**Implementar → Administrar implementaciones → editar (✏️) → Versión: Nueva
-versión → Implementar**. Editar la implementación existente conserva la misma URL
-`/exec`, así que no hay que volver a tocarla en la app. Con la copia actualizada,
-el primer sync crea sola la hoja `Elementos_6.2`.
+**Para cambiar de planilla después**, sin rehacer el deployment: edita
+`SPREADSHEET_ID`, pega el archivo de nuevo en el editor, guarda, y **Implementar →
+Administrar implementaciones → editar (✏️) → Versión: Nueva versión →
+Implementar**. Editar la implementación existente conserva la misma URL `/exec`,
+así que no hay que tocar nada en la app ni en los celulares del equipo. Lo mismo
+aplica para cualquier actualización del script.
+
+Comprobación rápida de a qué planilla apunta el deployment: abre su URL `/exec` en
+el navegador (un GET simple). Responde
+`{"status":"ok","mensaje":"Verano Energy – Registros de terreno – API activa",
+"planilla_configurada":true}`. Si `planilla_configurada` es `false`, falta el ID.
 
 ### 2. PWA (GitHub Pages)
 
