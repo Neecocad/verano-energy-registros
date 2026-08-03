@@ -259,6 +259,9 @@ que es la planilla.
 
 ### 1. Apps Script (planilla y deployment propios)
 
+> Guía paso a paso, pensada para hacerla con el navegador al lado:
+> [`apps-script/COMO-ACTUALIZAR.md`](apps-script/COMO-ACTUALIZAR.md)
+
 1. La planilla de destino ya está configurada en `apps-script/Codigo.gs`
    (`SPREADSHEET_ID`) y es la misma que usa el avance agregado. Para apuntar a
    otra, cambia **solo** esa constante: es lo que va entre `/d/` y `/edit` en la
