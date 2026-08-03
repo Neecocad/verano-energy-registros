@@ -84,10 +84,19 @@ textarea { resize: vertical; }
 .foto-preview img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 9px; border: 1px solid var(--border); }
 .foto-preview .btn-mini { margin-top: 6px; width: 100%; }
 
-.indicios-list, .individuos-list { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+.indicios-list, .individuos-list, .elementos-list { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
 .sub-item { border: 1px dashed var(--border); border-radius: 10px; padding: 12px; background: var(--blue-50); }
 .sub-item-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .sub-item-head strong { color: var(--blue); font-size: .9rem; }
+
+/* Especie vs. indicio: mismo bloque, distinto color para distinguirlos de una mirada. */
+.sub-item.especie { background: #f0fdf4; border-color: #bbf7d0; }
+.sub-item.especie .sub-item-head strong { color: #15803d; }
+
+.add-row { display: flex; gap: 10px; }
+.add-row .btn-ghost { flex: 1; margin: 0; }
+
+input[data-codigo-parcela] { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 600; letter-spacing: .04em; }
 
 .actions { display: flex; gap: 10px; margin-top: 6px; }
 .btn-primary { flex: 2; padding: 15px; background: var(--blue); color: #fff; border: none; border-radius: 11px; font-size: 1.05rem; font-weight: 600; cursor: pointer; }
@@ -106,3 +115,5 @@ textarea { resize: vertical; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+.btn-link { background: none; border: none; color: var(--blue); text-decoration: underline; font-size: .8rem; cursor: pointer; padding: 0; width: auto; font-family: inherit; }
