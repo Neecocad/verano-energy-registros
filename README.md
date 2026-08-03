@@ -220,24 +220,37 @@ que es la planilla.
 ### Qué contiene
 
 - **Parámetros** (los completa el equipo a mano): valor unitario por EDT, monto
-  total del contrato y valor de la hora-hombre. Sin ellos, la sección de
-  valorización queda en cero pero el resto funciona igual.
+  total del contrato, valor de la hora-hombre y HH presupuestadas. Sin ellos, las
+  secciones de valorización y desviación quedan en cero, pero el resto funciona
+  igual.
 - **Avance vs meta** — registros y unidades levantadas contra las 177 de cada EDT,
   % de avance, ponderación (33,33 / 33,33 / 33,34), aporte ponderado y fecha del
   último registro.
 - **Valorización del servicio** — monto ejecutado por EDT y total, % del contrato,
   saldo por ejecutar, y el monto según avance ponderado como contraste para
   contratos que se pagan por hito en vez de por unidad.
+- **Control de consistencia** — por EDT, lo que el avance **reporta** haber
+  ejecutado contra las unidades que **efectivamente llegaron** desde esta app, con
+  la diferencia y un estado legible. Una diferencia positiva significa jornadas
+  reportadas sin respaldo de terreno: sin foto, sin GPS y sin evidencia para el
+  informe. Solo es posible porque ambas apps escriben en la misma planilla.
 - **Productividad** — días efectivos en terreno, unidades por día, ritmo de los
-  últimos 7 días, unidades restantes y días estimados para terminar; más
-  horas-hombre, HH por unidad, costo en HH y margen estimado.
+  últimos 7 días, unidades restantes y días estimados para terminar.
+- **Horas-hombre y rendimiento** (desde `Datos_Avance`) — por EDT: HH acumuladas,
+  HH por unidad, unidades por HH, jornadas, dotación promedio y duración media de
+  jornada. Más la proyección de esfuerzo: HH estimadas para completar la meta, HH
+  totales proyectadas, % del presupuesto consumido, desviación proyectada, costo
+  de las HH ejecutadas y pendientes, costo en HH por unidad y margen estimado.
 - **Calidad del dato** — duplicados (registros menos unidades distintas), cuántas
   faltan para la meta, % con foto y % con GPS por EDT.
 - **Hallazgos ecológicos** — indicios por transecto, especies registradas y
   distintas, cobertura media, % de parcelas con curureras, % de calicatas con
   geófita e individuos por calicata.
-- **Por persona evaluadora** — tabla `QUERY` que se expande sola; crece con el
-  equipo sin pisar las secciones de arriba.
+- **Detalle** — tres tablas `QUERY` que crecen solas con los datos: unidades por
+  persona evaluadora, HH por responsable, y la comparación **día a día** entre lo
+  reportado en el avance y lo registrado en terreno. Van al final y en **columnas
+  distintas**: si dos tablas expansibles se solaparan, Google Sheets bloquea la
+  segunda con un error de "resultado no expandido".
 
 ### Notas de diseño
 
@@ -247,9 +260,17 @@ que es la planilla.
 - Las referencias a columnas se calculan desde el esquema (`COLUMNAS_*`), no se
   escriben a mano: si cambia el orden de las columnas, las fórmulas siguen
   apuntando al campo correcto.
-- Las horas-hombre salen de `Datos_Avance`, que escribe la **otra** app. Van
-  envueltas en `IFERROR`, así que si esa hoja todavía no existe el KPI muestra 0
-  en vez de `#REF`.
+- Todo lo que sale de `Datos_Avance` (HH, dotación, jornada, lo reportado) lo
+  escribe la **otra** app. Va envuelto en `IFERROR`, así que si esa hoja todavía
+  no existe el KPI muestra 0 en vez de `#REF`.
+- Las posiciones de columna de `Datos_Avance` viven en `COL_AVANCE`. Ese esquema
+  lo controla `Control_VeranoEnergy`, no esta app: si allá se reordenan las
+  columnas, hay que actualizar esos números o el KPI leerá el dato equivocado.
+- La comparación día a día se arma con **una sola** `QUERY`: las cuatro fuentes
+  (avance y los 3 EDT) aportan las mismas cuatro columnas —fecha, EDT, reportado,
+  registrado— rellenando con cero la que no les corresponde. Así un único
+  `group by` devuelve ambas cifras enfrentadas, sin sumarlas entre sí ni generar
+  producto cartesiano.
 - Si falla la construcción del KPI, el registro **igual queda guardado**: el sync
   no se da por fallido y el error se informa aparte, en `kpi_error`.
 - Para cambiar las fórmulas más adelante, sube `KPI_VERSION` en el script: la hoja

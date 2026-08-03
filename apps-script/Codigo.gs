@@ -100,14 +100,18 @@ const COLUMNAS_INDIV_63 = [
 // Control_VeranoEnergy en esta misma planilla) para las horas-hombre.
 const SHEET_KPI = 'KPI';
 const SHEET_AVANCE = 'Datos_Avance'; // la escribe la otra app; puede no existir aún
-// Posición de 'horas_hombre' en el esquema COLUMNAS de Datos_Avance
-// (Control_VeranoEnergy). Si allá cambia el orden de columnas, hay que
-// actualizar este número.
-const COL_HH_AVANCE = 16;
+
+// Posiciones en el esquema COLUMNAS de Datos_Avance (repo Control_VeranoEnergy).
+// Esta app no controla ese esquema: si allá cambia el orden de las columnas,
+// hay que actualizar estos números o el KPI leerá el dato equivocado.
+const COL_AVANCE = {
+  fecha: 5, responsable: 6, codigo_edt: 7, cantidad_ejecutada: 11,
+  cantidad_personas: 12, duracion_horas: 15, horas_hombre: 16,
+};
 
 // Subir KPI_VERSION regenera las fórmulas en las planillas ya creadas,
 // conservando los parámetros que el equipo haya escrito a mano.
-const KPI_VERSION = 1;
+const KPI_VERSION = 2;
 
 const META_POR_EDT = 177; // 1 unidad por hectárea
 const PONDERACION = { '6.1': 0.3333, '6.2': 0.3333, '6.3': 0.3334 };
@@ -366,10 +370,37 @@ function _refTodos(campo) {
   return '{' + ['6.1', '6.2', '6.3'].map(function (e) { return _refReg(e, campo); }).join(';') + '}';
 }
 
-// Horas-hombre desde Datos_Avance, que escribe la otra app. Puede no existir
+// Columna abierta de Datos_Avance, que escribe la otra app. Puede no existir
 // todavía, así que toda referencia va envuelta en IFERROR.
-function _refAvance(letra) {
+function _refAvance(campo) {
+  const letra = _colLetra(COL_AVANCE[campo]);
   return "'" + SHEET_AVANCE + "'!" + letra + '2:' + letra;
+}
+
+// Comparación día a día entre lo reportado en el avance y lo efectivamente
+// registrado. El truco: las cuatro fuentes (Datos_Avance y los 3 EDT) aportan
+// las MISMAS cuatro columnas —fecha, EDT, reportado, registrado— poniendo cero
+// en la que no les corresponde. Así un único `group by` devuelve ambas cifras
+// enfrentadas, sin sumarlas entre sí ni cruzarlas.
+function _formulaDetalleDiario() {
+  const fa = _refAvance('fecha');
+  const ea = _refAvance('codigo_edt');
+  const ca = _refAvance('cantidad_ejecutada');
+  const partes = [
+    fa + ',' + ea + ',ARRAYFORMULA(N(' + ca + ')),ARRAYFORMULA(N(' + ca + ')*0)',
+  ];
+  ['6.1', '6.2', '6.3'].forEach(function (e) {
+    const f = _refReg(e, 'fecha');
+    partes.push(f
+      + ',ARRAYFORMULA(IF(LEN(' + f + '),"' + e + '",""))'
+      + ',ARRAYFORMULA(N(LEN(' + f + '))*0)'
+      + ',ARRAYFORMULA(N(LEN(' + f + ')>0))');
+  });
+  return '=IFERROR(QUERY({' + partes.join(';') + '},'
+    + '"select Col1, Col2, sum(Col3), sum(Col4), sum(Col3)-sum(Col4) '
+    + 'where Col1 is not null group by Col1, Col2 order by Col1 desc, Col2 '
+    + "label Col1 'Fecha', Col2 'EDT', sum(Col3) 'Reportado', sum(Col4) 'Registrado', "
+    + "sum(Col3)-sum(Col4) 'Diferencia'\",0),\"Sin datos suficientes todavía\")";
 }
 
 function _asegurarKPI(ss) {
@@ -451,6 +482,8 @@ function _construirKPI(sheet, prev) {
   fmt(rContrato, 2, CLP);
   const rValorHH = fila(['Valor hora-hombre (CLP por HH)', param('Valor hora-hombre (CLP por HH)')]);
   fmt(rValorHH, 2, CLP);
+  const rHHPresup = fila(['Horas-hombre presupuestadas (total)', param('Horas-hombre presupuestadas (total)')]);
+  fmt(rHHPresup, 2, NUM);
   fila([]);
 
   // ---------------- Avance vs meta ----------------
@@ -504,6 +537,35 @@ function _construirKPI(sheet, prev) {
   fmt(rPonderado, 4, CLP);
   fila([]);
 
+  // ---------------- Control de consistencia ----------------
+  // Compara lo que la app de avance REPORTA haber ejecutado contra las unidades
+  // que efectivamente llegaron desde la app de registros. Una diferencia
+  // positiva significa jornadas reportadas sin respaldo de terreno: sin foto,
+  // sin GPS y sin evidencia para el informe. Solo es posible porque ambas apps
+  // escriben en esta misma planilla.
+  seccion('CONTROL DE CONSISTENCIA — avance reportado vs. registros recibidos');
+  cabecera(['EDT', 'Unidad', 'Reportado en avance', 'Registrado en terreno', 'Diferencia', 'Estado']);
+  const rCons0 = filas.length + 1;
+  ['6.1', '6.2', '6.3'].forEach(function (e) {
+    const r = filas.length + 1;
+    const estado = '=IF(AND(C' + r + '=0,D' + r + '=0),"Sin datos aún",'
+      + 'IF(E' + r + '=0,"✔ Cuadra",'
+      + 'IF(E' + r + '>0,"⚠ Faltan "&E' + r + '&" registro(s) de terreno",'
+      + '"⚠ "&ABS(E' + r + ')&" registro(s) sin avance reportado")))';
+    fila([e, unidad[e],
+      '=IFERROR(SUMIF(' + _refAvance('codigo_edt') + ',"' + e + '",' + _refAvance('cantidad_ejecutada') + '),0)',
+      '=' + unicas[e],
+      '=C' + r + '-D' + r,
+      estado]);
+  });
+  const rCons1 = filas.length;
+  const rTotalCons = fila(['TOTAL', '',
+    '=SUM(C' + rCons0 + ':C' + rCons1 + ')',
+    '=SUM(D' + rCons0 + ':D' + rCons1 + ')',
+    '=C' + (rCons1 + 1) + '-D' + (rCons1 + 1), '']);
+  fila(['Una diferencia positiva = jornadas reportadas sin registro de terreno que las respalde.']);
+  fila([]);
+
   // ---------------- Productividad ----------------
   seccion('PRODUCTIVIDAD');
   const diasRef = 'COUNTUNIQUE(' + _refTodos('fecha') + ')';
@@ -519,16 +581,60 @@ function _construirKPI(sheet, prev) {
   const rDiasFalta = fila(['Días efectivos estimados para terminar',
     '=IFERROR(IF(B' + rPorDia + '=0,"—",ROUNDUP(B' + rRestantes + '/B' + rPorDia + ')),"—")']);
   fmt(rDiasFalta, 2, NUM);
-  // Horas-hombre: solo existen si la otra app ya sincronizó avance agregado.
-  const rHH = fila(['Horas-hombre acumuladas (Datos_Avance)',
-    '=IFERROR(SUM(' + _refAvance(_colLetra(COL_HH_AVANCE)) + '),0)']);
-  fmt(rHH, 2, NUM);
-  const rHHUnidad = fila(['Horas-hombre por unidad',
-    '=IFERROR(B' + rHH + '/B' + rTotalUnid + ',0)']);
-  fmt(rHHUnidad, 2, NUM);
-  const rCostoHH = fila(['Costo estimado en HH (CLP)',
-    '=IFERROR(B' + rHH + '*B' + rValorHH + ',0)']);
+  fila([]);
+
+  // ---------------- Horas-hombre y rendimiento ----------------
+  // Todo esto sale de Datos_Avance, que escribe la app de avance: dotación,
+  // duración de jornada y HH por jornada. Va envuelto en IFERROR porque esa
+  // hoja puede no existir todavía (si aún no se sincroniza ningún avance).
+  seccion('HORAS-HOMBRE Y RENDIMIENTO — desde el avance agregado');
+  cabecera(['EDT', 'Unidad', 'HH acumuladas', 'Unidades levantadas', 'HH por unidad',
+    'Unidades por HH', 'Jornadas', 'Dotación promedio', 'Jornada promedio (h)']);
+  const rHH0 = filas.length + 1;
+  const edtA = _refAvance('codigo_edt');
+  ['6.1', '6.2', '6.3'].forEach(function (e) {
+    const r = filas.length + 1;
+    fila([e, unidad[e],
+      '=IFERROR(SUMIF(' + edtA + ',"' + e + '",' + _refAvance('horas_hombre') + '),0)',
+      '=' + unicas[e],
+      '=IFERROR(C' + r + '/D' + r + ',0)',
+      '=IFERROR(D' + r + '/C' + r + ',0)',
+      '=IFERROR(COUNTIF(' + edtA + ',"' + e + '"),0)',
+      '=IFERROR(AVERAGEIF(' + edtA + ',"' + e + '",' + _refAvance('cantidad_personas') + '),0)',
+      '=IFERROR(AVERAGEIF(' + edtA + ',"' + e + '",' + _refAvance('duracion_horas') + '),0)']);
+    [3, 5, 6, 8, 9].forEach(function (c) { fmt(r, c, NUM); });
+  });
+  const rHH1 = filas.length;
+  const rTotHH = fila(['TOTAL', '',
+    '=SUM(C' + rHH0 + ':C' + rHH1 + ')',
+    '=SUM(D' + rHH0 + ':D' + rHH1 + ')',
+    '=IFERROR(C' + (rHH1 + 1) + '/D' + (rHH1 + 1) + ',0)',
+    '=IFERROR(D' + (rHH1 + 1) + '/C' + (rHH1 + 1) + ',0)',
+    '=SUM(G' + rHH0 + ':G' + rHH1 + ')', '', '']);
+  [3, 5, 6].forEach(function (c) { fmt(rTotHH, c, NUM); });
+
+  // Proyección de esfuerzo: cuánto falta, en horas y en dinero, al ritmo actual.
+  const rHHFalta = fila(['HH estimadas para completar la meta',
+    '=IFERROR(B' + rRestantes + '*E' + rTotHH + ',0)']);
+  fmt(rHHFalta, 2, NUM);
+  const rHHTotalProy = fila(['HH totales proyectadas (ejecutadas + pendientes)',
+    '=IFERROR(C' + rTotHH + '+B' + rHHFalta + ',0)']);
+  fmt(rHHTotalProy, 2, NUM);
+  const rHHPct = fila(['% del presupuesto de HH consumido',
+    '=IFERROR(C' + rTotHH + '/B' + rHHPresup + ',0)']);
+  fmt(rHHPct, 2, PCT);
+  const rHHDesv = fila(['Desviación vs. presupuesto de HH (proyectada)',
+    '=IFERROR(B' + rHHTotalProy + '-B' + rHHPresup + ',0)']);
+  fmt(rHHDesv, 2, NUM);
+  const rCostoHH = fila(['Costo de las HH ejecutadas (CLP)',
+    '=IFERROR(C' + rTotHH + '*B' + rValorHH + ',0)']);
   fmt(rCostoHH, 2, CLP);
+  const rCostoFalta = fila(['Costo estimado de las HH pendientes (CLP)',
+    '=IFERROR(B' + rHHFalta + '*B' + rValorHH + ',0)']);
+  fmt(rCostoFalta, 2, CLP);
+  const rCostoUnidad = fila(['Costo en HH por unidad levantada (CLP)',
+    '=IFERROR(B' + rCostoHH + '/D' + rTotHH + ',0)']);
+  fmt(rCostoUnidad, 2, CLP);
   const rMargen = fila(['Margen estimado (ejecutado − costo HH)',
     '=IFERROR(D' + rTotalVal + '-B' + rCostoHH + ',0)']);
   fmt(rMargen, 2, CLP);
@@ -575,14 +681,35 @@ function _construirKPI(sheet, prev) {
   fmt(rIndivX, 2, NUM);
   fila([]);
 
-  // ---------------- Por persona evaluadora ----------------
-  // QUERY se expande solo, así que va al final: crece con el equipo sin pisar
-  // ninguna sección de arriba.
-  seccion('POR PERSONA EVALUADORA (se expande solo)');
-  fila(['=IFERROR(QUERY(' + _refTodos('evaluadora')
-    + ',"select Col1, count(Col1) where Col1 is not null and Col1 <> \'\' '
-    + 'group by Col1 order by count(Col1) desc label Col1 \'Persona evaluadora\', count(Col1) \'Unidades\'",0)'
-    + ',"Sin registros todavía")']);
+  // ---------------- Tablas que se expanden solas ----------------
+  // Estas tres son QUERY: crecen hacia abajo según los datos. Van al final y en
+  // columnas separadas, porque si dos se expandieran sobre las mismas celdas
+  // Google Sheets bloquea la segunda con un error de "resultado no expandido".
+  seccion('DETALLE (tablas que crecen solas con los datos)');
+  fila(['Unidades por persona evaluadora', '', '', 'HH por responsable', '',
+    '', 'Día a día: avance reportado vs. registros recibidos']);
+  cabeceras.push(filas.length);
+  fila([
+    // A: unidades levantadas por cada persona evaluadora (desde registros)
+    '=IFERROR(QUERY(' + _refTodos('evaluadora')
+      + ',"select Col1, count(Col1) where Col1 is not null and Col1 <> \'\' '
+      + 'group by Col1 order by count(Col1) desc '
+      + 'label Col1 \'Persona evaluadora\', count(Col1) \'Unidades\'",0)'
+      + ',"Sin registros todavía")',
+    '', '',
+    // D: horas-hombre por responsable (desde el avance agregado)
+    '=IFERROR(QUERY({' + _refAvance('responsable') + ',ARRAYFORMULA(N(' + _refAvance('horas_hombre') + '))}'
+      + ',"select Col1, sum(Col2) where Col1 is not null and Col1 <> \'\' '
+      + 'group by Col1 order by sum(Col2) desc '
+      + 'label Col1 \'Responsable\', sum(Col2) \'HH\'",0)'
+      + ',"Sin avances todavía")',
+    '', '',
+    // G: comparación día a día. Cada fuente aporta las mismas 4 columnas
+    // (fecha, EDT, reportado, registrado) rellenando con cero la que no le
+    // corresponde, para que un solo agrupamiento devuelva ambas cifras
+    // enfrentadas sin mezclarlas.
+    _formulaDetalleDiario(),
+  ]);
 
   // ---- Escritura ----
   const ancho = Math.max.apply(null, filas.map(function (f) { return f.length; }));
