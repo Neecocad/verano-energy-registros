@@ -111,7 +111,7 @@ const COL_AVANCE = {
 
 // Subir KPI_VERSION regenera las fórmulas en las planillas ya creadas,
 // conservando los parámetros que el equipo haya escrito a mano.
-const KPI_VERSION = 2;
+const KPI_VERSION = 3;
 
 const META_POR_EDT = 177; // 1 unidad por hectárea
 const PONDERACION = { '6.1': 0.3333, '6.2': 0.3333, '6.3': 0.3334 };
@@ -421,6 +421,10 @@ function _asegurarKPI(ss) {
   // versión 0 es un valor válido y no debe descartar lo ya escrito.
   const paramsPrevios = sheet.getLastRow() > 0 ? _leerParametrosKPI(sheet) : {};
   sheet.clear();
+  // clear() borra el contenido pero NO los formatos de número: al cambiar el
+  // layout entre versiones, una celda heredaba el formato de lo que antes
+  // ocupaba esa fila (p. ej. "Días efectivos: 1 CLP").
+  sheet.clearFormats();
   _construirKPI(sheet, paramsPrevios);
   sheet.getRange('H1').setValue(KPI_VERSION);
   sheet.hideColumns(8); // la celda de versión no es parte del informe
@@ -445,6 +449,7 @@ function _construirKPI(sheet, prev) {
   const filas = [];
   const formatos = []; // { fila (1-based), col, formato }
   const titulos = [];  // filas de encabezado de sección
+  let filaDetalleDiario = 0;
   const cabeceras = [];
 
   function fila(vals) { filas.push(vals); return filas.length; }
@@ -499,7 +504,7 @@ function _construirKPI(sheet, prev) {
       '=IFERROR(E' + r + '/C' + r + ',0)',
       PONDERACION[e],
       '=F' + r + '*G' + r,
-      '=IFERROR(TEXT(MAX(' + _refReg(e, 'fecha') + '),"yyyy-mm-dd"),"—")']);
+      '=IF(COUNT(' + _refReg(e, 'fecha') + ')=0,"—",TEXT(MAX(' + _refReg(e, 'fecha') + '),"yyyy-mm-dd"))']);
     fmt(r, 6, PCT); fmt(r, 7, PCT); fmt(r, 8, PCT);
   });
   const rAvance1 = filas.length;
@@ -615,16 +620,16 @@ function _construirKPI(sheet, prev) {
 
   // Proyección de esfuerzo: cuánto falta, en horas y en dinero, al ritmo actual.
   const rHHFalta = fila(['HH estimadas para completar la meta',
-    '=IFERROR(B' + rRestantes + '*E' + rTotHH + ',0)']);
+    '=IFERROR(SUMPRODUCT((' + META_POR_EDT + '-D' + rHH0 + ':D' + rHH1 + ')*E' + rHH0 + ':E' + rHH1 + '),0)']);
   fmt(rHHFalta, 2, NUM);
   const rHHTotalProy = fila(['HH totales proyectadas (ejecutadas + pendientes)',
     '=IFERROR(C' + rTotHH + '+B' + rHHFalta + ',0)']);
   fmt(rHHTotalProy, 2, NUM);
   const rHHPct = fila(['% del presupuesto de HH consumido',
-    '=IFERROR(C' + rTotHH + '/B' + rHHPresup + ',0)']);
+    '=IF(B' + rHHPresup + '="","— (falta el parámetro)",IFERROR(C' + rTotHH + '/B' + rHHPresup + ',0))']);
   fmt(rHHPct, 2, PCT);
   const rHHDesv = fila(['Desviación vs. presupuesto de HH (proyectada)',
-    '=IFERROR(B' + rHHTotalProy + '-B' + rHHPresup + ',0)']);
+    '=IF(B' + rHHPresup + '="","— (falta el parámetro)",IFERROR(B' + rHHTotalProy + '-B' + rHHPresup + ',0))']);
   fmt(rHHDesv, 2, NUM);
   const rCostoHH = fila(['Costo de las HH ejecutadas (CLP)',
     '=IFERROR(C' + rTotHH + '*B' + rValorHH + ',0)']);
@@ -710,6 +715,9 @@ function _construirKPI(sheet, prev) {
     // enfrentadas sin mezclarlas.
     _formulaDetalleDiario(),
   ]);
+  // La QUERY se expande sola y su salida no hereda formato: sin esto, la fecha
+  // aparece como número de serie (46237 en vez de 2026-08-03).
+  filaDetalleDiario = filas.length;
 
   // ---- Escritura ----
   const ancho = Math.max.apply(null, filas.map(function (f) { return f.length; }));
@@ -729,6 +737,9 @@ function _construirKPI(sheet, prev) {
     sheet.getRange(r, 1, 1, ancho).setFontWeight('bold').setBackground('#eff8ff');
   });
   formatos.forEach(function (f) { sheet.getRange(f.r, f.c).setNumberFormat(f.f); });
+  if (filaDetalleDiario) {
+    sheet.getRange(filaDetalleDiario + 1, 7, 400, 1).setNumberFormat('yyyy-mm-dd');
+  }
   sheet.setColumnWidth(1, 320);
   sheet.setFrozenRows(2);
 }
